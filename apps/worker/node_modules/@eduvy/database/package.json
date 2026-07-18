@@ -1,0 +1,39 @@
+{
+  "name": "@eduvy/database",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "db:generate": "pnpm exec prisma generate --schema=prisma/schema.prisma",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:push": "prisma db push",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:studio": "prisma studio",
+    "sql:rls": "node scripts/apply-sql.mjs sql/rls",
+    "sql:roles": "node scripts/apply-sql.mjs sql/roles",
+    "sql:post-migrate": "pnpm sql:roles && pnpm sql:rls",
+    "verify:rls": "tsx scripts/verify-rls.ts",
+    "test:integration": "jest --config jest.integration.config.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.5.0"
+  },
+  "devDependencies": {
+    "@eduvy/tsconfig": "workspace:*",
+    "argon2": "^0.41.1",
+    "pg": "^8.14.1",
+    "prisma": "^6.5.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "@jest/globals": "^29.7.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.6"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  }
+}

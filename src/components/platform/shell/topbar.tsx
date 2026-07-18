@@ -11,16 +11,13 @@ import {
 } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { quickCreateActions } from "@/config/platform-navigation";
-import {
-  currentOrganization,
-  currentUser,
-  mockNotifications,
-} from "@/mocks/platform";
+import { LogoutButton } from "@/components/auth/logout-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar } from "@/components/platform/ui/avatar";
 import { MobileMenuButton } from "./mobile-drawer";
-import { cn } from "@/lib/utils";
+import { usePlatform } from "./platform-provider";
+import { getInitials } from "@/lib/platform/user-display";
 
 function buildBreadcrumbs(pathname: string) {
   const segments = pathname.replace("/app", "").split("/").filter(Boolean);
@@ -38,8 +35,10 @@ function buildBreadcrumbs(pathname: string) {
 
 export function Topbar() {
   const pathname = usePathname();
+  const { user, tenantContext } = usePlatform();
+  const activeTenant = tenantContext.activeTenant;
   const crumbs = buildBreadcrumbs(pathname);
-  const unread = mockNotifications.filter((n) => !n.read).length;
+  const initials = getInitials(user.fullName);
 
   return (
     <header className="z-40 flex h-16 shrink-0 items-center gap-3 border-b border-border bg-surface/95 px-4 backdrop-blur-md md:gap-4 md:px-6">
@@ -106,24 +105,15 @@ export function Topbar() {
             <button
               type="button"
               className="focus-ring relative inline-flex size-10 items-center justify-center rounded-xl text-text-muted hover:bg-background-light hover:text-text-dark"
-              aria-label={`Notificações${unread ? `, ${unread} não lidas` : ""}`}
+              aria-label="Notificações"
             >
               <Bell className="size-5" />
-              {unread > 0 && (
-                <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-primary" aria-hidden />
-              )}
             </button>
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
-            <DropdownMenu.Content className="z-50 w-80 rounded-xl border border-border-light bg-surface-light p-2 shadow-xl" align="end" sideOffset={8}>
-              <p className="px-2 py-1 text-xs font-bold uppercase tracking-wider text-text-muted">Notificações</p>
-              {mockNotifications.map((n) => (
-                <div key={n.id} className={cn("rounded-lg px-3 py-2", !n.read && "bg-primary/5")}>
-                  <p className="text-sm font-semibold text-[#3d3654]">{n.title}</p>
-                  <p className="text-xs text-text-muted">{n.body}</p>
-                  <p className="mt-1 text-[10px] text-text-muted">{n.time}</p>
-                </div>
-              ))}
+            <DropdownMenu.Content className="z-50 w-80 rounded-xl border border-border-light bg-surface-light p-4 shadow-xl" align="end" sideOffset={8}>
+              <p className="text-sm font-semibold text-[#3d3654]">Notificações</p>
+              <p className="mt-2 text-sm text-text-muted">Nenhuma notificação no momento.</p>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
@@ -139,9 +129,9 @@ export function Topbar() {
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
             <button type="button" className="focus-ring flex items-center gap-2 rounded-xl p-1 hover:bg-background-light">
-              <Avatar initials={currentUser.avatarInitials} className="size-8" />
+              <Avatar initials={initials} className="size-8" />
               <span className="hidden max-w-[8rem] truncate text-left text-sm font-medium text-[#3d3654] lg:block">
-                {currentUser.name}
+                {user.fullName}
               </span>
               <ChevronDown className="hidden size-4 text-text-muted lg:block" aria-hidden />
             </button>
@@ -149,14 +139,18 @@ export function Topbar() {
           <DropdownMenu.Portal>
             <DropdownMenu.Content className="z-50 min-w-[14rem] rounded-xl border border-border-light bg-surface-light p-1.5 shadow-xl" align="end" sideOffset={8}>
               <div className="border-b border-border-light px-3 py-2">
-                <p className="text-sm font-semibold">{currentUser.name}</p>
-                <p className="text-xs text-text-muted">{currentOrganization.name}</p>
+                <p className="text-sm font-semibold">{user.fullName}</p>
+                <p className="text-xs text-text-muted">
+                  {activeTenant?.name ?? user.email}
+                </p>
               </div>
               <DropdownMenu.Item asChild>
                 <Link href="/app/settings" className="focus-ring block rounded-lg px-3 py-2 text-sm hover:bg-background-light">Configurações</Link>
               </DropdownMenu.Item>
               <DropdownMenu.Item asChild>
-                <Link href="/login" className="focus-ring block rounded-lg px-3 py-2 text-sm hover:bg-background-light">Sair</Link>
+                <div className="px-1 py-1">
+                  <LogoutButton variant="menu" title="Sair" />
+                </div>
               </DropdownMenu.Item>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>

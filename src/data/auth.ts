@@ -11,7 +11,10 @@ export const loginCopy = {
   noAccount: "Ainda não tem uma plataforma?",
   createPlatform: "Criar minha plataforma",
   demoNotice:
-    "Autenticação em desenvolvimento. Esta é uma demonstração conceitual para portfólio.",
+    "Use owner@horizonte.demo / Eduvy@2026! quando a API estiver rodando com seed.",
+  errors: {
+    generic: "Não foi possível entrar. Verifique suas credenciais e tente novamente.",
+  },
   panelTitle: "Sua jornada de ensino continua aqui.",
   panelDescription:
     "Gerencie cursos, acompanhe alunos e evolua sua operação em um único ambiente modular.",
@@ -19,6 +22,6 @@ export const loginCopy = {
     emailRequired: "Informe seu e-mail.",
     emailInvalid: "Informe um e-mail válido.",
     passwordRequired: "Informe sua senha.",
-    passwordMin: "A senha deve ter pelo menos 6 caracteres.",
+    passwordMin: "A senha deve ter pelo menos 8 caracteres.",
   },
 } as const;

@@ -57,7 +57,7 @@ export const platformNavSections: NavSection[] = [
     id: "resources",
     label: "Recursos educacionais",
     items: [
-      { id: "essays", label: "Redações", href: "/app/essays", icon: PenLine, badge: "12" },
+      { id: "essays", label: "Redações", href: "/app/essays", icon: PenLine },
       { id: "questions", label: "Banco de questões", href: "/app/questions", icon: LibraryBig },
       { id: "simulations", label: "Simulados", href: "/app/simulations", icon: FlaskConical },
       { id: "forum", label: "Fórum", href: "/app/forum", icon: MessageSquare },

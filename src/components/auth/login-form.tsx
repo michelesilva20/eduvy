@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Eye, EyeOff, Sparkles } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { loginCopy } from "@/data/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,7 @@ import { cn } from "@/lib/utils";
 interface FormErrors {
   email?: string;
   password?: string;
+  form?: string;
 }
 
 function validateEmail(email: string) {
@@ -19,17 +21,17 @@ function validateEmail(email: string) {
 }
 
 export function LoginForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
-  const [submitted, setSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setSubmitted(false);
 
     const nextErrors: FormErrors = {};
 
@@ -41,7 +43,7 @@ export function LoginForm() {
 
     if (!password) {
       nextErrors.password = loginCopy.validation.passwordRequired;
-    } else if (password.length < 6) {
+    } else if (password.length < 8) {
       nextErrors.password = loginCopy.validation.passwordMin;
     }
 
@@ -49,9 +51,35 @@ export function LoginForm() {
     if (Object.keys(nextErrors).length > 0) return;
 
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    setIsLoading(false);
-    setSubmitted(true);
+    setErrors({});
+
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+          rememberMe: remember,
+        }),
+      });
+
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { message?: string } | null;
+        setErrors({
+          form: body?.message ?? loginCopy.errors.generic,
+        });
+        return;
+      }
+
+      const next = searchParams.get("next");
+      router.push(next?.startsWith("/app") ? next : "/app");
+      router.refresh();
+    } catch {
+      setErrors({ form: loginCopy.errors.generic });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -65,30 +93,12 @@ export function LoginForm() {
         </p>
       </div>
 
-      {submitted && (
+      {errors.form && (
         <div
-          role="status"
-          className="mb-6 overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/[0.08] to-secondary/[0.05] p-4"
+          role="alert"
+          className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
         >
-          <div className="flex gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <Sparkles className="size-4" aria-hidden />
-            </span>
-            <div>
-              <p className="font-[family-name:var(--font-sora)] text-sm font-bold text-[#3d3654]">
-                Acesso liberado na demo
-              </p>
-              <p className="mt-1 font-[family-name:var(--font-nunito)] text-sm text-text-muted">
-                {loginCopy.demoNotice}
-              </p>
-            </div>
-          </div>
-          <Button asChild size="sm" className="mt-4 w-full sm:w-auto">
-            <Link href="/app">
-              Acessar plataforma
-              <ArrowRight className="size-4" aria-hidden />
-            </Link>
-          </Button>
+          {errors.form}
         </div>
       )}
 
@@ -124,7 +134,7 @@ export function LoginForm() {
             <button
               type="button"
               className="focus-ring rounded font-[family-name:var(--font-nunito)] text-xs font-semibold text-primary hover:text-primary-bright"
-              title="Demonstração — em breve"
+              title="Em breve"
             >
               {loginCopy.forgotPassword}
             </button>

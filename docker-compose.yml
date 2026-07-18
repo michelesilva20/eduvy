@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: eduvy-postgres
+    environment:
+      POSTGRES_DB: eduvy
+      POSTGRES_USER: eduvy_migration
+      POSTGRES_PASSWORD: eduvy_migration_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - eduvy_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eduvy_migration -d eduvy"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: eduvy-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - eduvy_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: eduvy-minio
+    environment:
+      MINIO_ROOT_USER: eduvy_minio
+      MINIO_ROOT_PASSWORD: eduvy_minio_dev_secret
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - eduvy_minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 eduvy_minio eduvy_minio_dev_secret &&
+      mc mb -p local/eduvy-quarantine || true &&
+      mc mb -p local/eduvy-private || true
+      "
+
+volumes:
+  eduvy_pg_data:
+  eduvy_redis_data:
+  eduvy_minio_data:

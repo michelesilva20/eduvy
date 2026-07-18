@@ -1,15 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import { LogoutButton } from "@/components/auth/logout-button";
 import { usePathname } from "next/navigation";
-import { ChevronLeft, ChevronRight, HelpCircle, LogOut } from "lucide-react";
+import { ChevronLeft, ChevronRight, HelpCircle } from "lucide-react";
 import { platformNavSections } from "@/config/platform-navigation";
-import { currentOrganization, currentUser } from "@/mocks/platform";
 import { EduvyLogo } from "@/components/shared/eduvy-logo";
 import { EduvyLogoImage } from "@/components/brand/eduvy-image";
 import { Avatar } from "@/components/platform/ui/avatar";
 import { Badge } from "@/components/platform/ui/badge";
+import { TenantSwitcher } from "./tenant-switcher";
 import { usePlatform } from "./platform-provider";
+import { getInitials } from "@/lib/platform/user-display";
 import { cn } from "@/lib/utils";
 
 function isActiveRoute(pathname: string, href: string) {
@@ -19,7 +21,8 @@ function isActiveRoute(pathname: string, href: string) {
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { sidebarCollapsed, toggleSidebar } = usePlatform();
+  const { user, sidebarCollapsed, toggleSidebar } = usePlatform();
+  const initials = getInitials(user.fullName);
 
   return (
     <aside
@@ -87,24 +90,22 @@ export function Sidebar() {
 
       <div className="shrink-0 border-t border-border-light p-3">
         {!sidebarCollapsed && (
-          <div className="mb-3 rounded-xl border border-border-light bg-background-light p-3">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Plano</p>
-            <p className="mt-1 font-[family-name:var(--font-sora)] text-sm font-bold text-[#3d3654]">
-              {currentOrganization.plan}
-            </p>
-            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-light">
-              <div className="h-full w-[72%] rounded-full bg-primary" />
-            </div>
-            <p className="mt-1 text-[10px] text-text-muted">72% do limite de alunos</p>
+          <div className="mb-3">
+            <TenantSwitcher />
+          </div>
+        )}
+        {sidebarCollapsed && (
+          <div className="mb-3 flex justify-center">
+            <TenantSwitcher compact />
           </div>
         )}
 
         <div className={cn("flex items-center gap-2", sidebarCollapsed && "justify-center")}>
-          <Avatar initials={currentUser.avatarInitials} />
+          <Avatar initials={initials} />
           {!sidebarCollapsed && (
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-[#3d3654]">{currentUser.name}</p>
-              <p className="truncate text-xs text-text-muted">{currentUser.role}</p>
+              <p className="truncate text-sm font-semibold text-[#3d3654]">{user.fullName}</p>
+              <p className="truncate text-xs text-text-muted">{user.email}</p>
             </div>
           )}
         </div>
@@ -117,13 +118,7 @@ export function Sidebar() {
           >
             <HelpCircle className="size-4" aria-hidden />
           </Link>
-          <Link
-            href="/login"
-            title="Sair"
-            className="focus-ring inline-flex size-9 items-center justify-center rounded-lg text-text-muted hover:bg-background-light hover:text-text-dark"
-          >
-            <LogOut className="size-4" aria-hidden />
-          </Link>
+          <LogoutButton />
           <button
             type="button"
             onClick={toggleSidebar}

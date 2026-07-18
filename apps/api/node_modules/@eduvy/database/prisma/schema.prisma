@@ -1,0 +1,809 @@
+// Eduvy — Foundation schema (control plane + tenant-scoped)
+// RLS policies applied via packages/database/sql/rls/
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum TenantStatus {
+  PROVISIONING
+  ACTIVE
+  SUSPENDED
+  CANCELED
+  FAILED
+}
+
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  REMOVED
+}
+
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+  MICROSOFT
+  OIDC
+  SAML
+}
+
+enum ScopeType {
+  PLATFORM
+  TENANT
+  ORGANIZATION_UNIT
+  GROUP
+  COURSE
+  COHORT
+  OWN_RESOURCE
+}
+
+enum CourseVersionStatus {
+  DRAFT
+  IN_REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+enum GroupType {
+  DEPARTMENT
+  TEAM
+  CLASS
+  COHORT
+  BRANCH
+  CUSTOM
+}
+
+enum ModuleCatalogStatus {
+  ACTIVE
+  DEPRECATED
+  BETA
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  SUSPENDED
+}
+
+enum OutboxStatus {
+  PENDING
+  PUBLISHED
+  FAILED
+}
+
+enum DeadLetterStatus {
+  OPEN
+  INVESTIGATING
+  READY_FOR_REPLAY
+  REPLAYED
+  RESOLVED
+  DISCARDED
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
+enum ActorType {
+  USER
+  SYSTEM
+  SUPPORT
+  API_KEY
+}
+
+enum PrivacyRequestType {
+  EXPORT
+  CORRECTION
+  DELETION
+  ANONYMIZATION
+  PORTABILITY
+}
+
+enum PrivacyRequestStatus {
+  RECEIVED
+  IN_PROGRESS
+  COMPLETED
+  REJECTED
+}
+
+// ─── Control plane (global) ──────────────────────────────────────────────────
+
+model User {
+  id              String   @id @default(uuid()) @db.Uuid
+  email           String   @unique @db.Citext
+  emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz(6)
+  fullName        String   @map("full_name")
+  locale          String   @default("pt-BR")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  authIdentities AuthIdentity[]
+  sessions       Session[]
+  memberships    Membership[]
+
+  @@map("users")
+}
+
+model AuthIdentity {
+  id           String       @id @default(uuid()) @db.Uuid
+  userId       String       @map("user_id") @db.Uuid
+  provider     AuthProvider
+  providerSub  String?      @map("provider_sub")
+  passwordHash String?      @map("password_hash")
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, providerSub])
+  @@index([userId])
+  @@map("auth_identities")
+}
+
+model Session {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  tokenFamilyId    String    @map("token_family_id") @db.Uuid
+  refreshTokenHash String    @map("refresh_token_hash")
+  deviceName       String?   @map("device_name")
+  userAgentSummary String?   @map("user_agent_summary")
+  ipAddress        String?   @map("ip_address") @db.Inet
+  lastSeenAt       DateTime? @map("last_seen_at") @db.Timestamptz(6)
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revokeReason     String?   @map("revoke_reason")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([tokenFamilyId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model Tenant {
+  id        String       @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String       @unique
+  status    TenantStatus @default(PROVISIONING)
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  domains         TenantDomain[]
+  memberships     Membership[]
+  subscriptions   Subscription[]
+  tenantRoles     TenantRole[]
+  groups          Group[]
+  courses         Course[]
+  auditLogs       AuditLog[]
+  entitlements    TenantEntitlement[]
+  outboxEvents    OutboxEvent[]
+  invitations     Invitation[]
+  cohorts         Cohort[]
+
+  @@map("tenants")
+}
+
+model TenantDomain {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  domain    String   @unique
+  isPrimary Boolean  @default(false) @map("is_primary")
+  verifiedAt DateTime? @map("verified_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@map("tenant_domains")
+}
+
+model Plan {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique
+  name        String
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  versions PlanVersion[]
+
+  @@map("plans")
+}
+
+model PlanVersion {
+  id        String   @id @default(uuid()) @db.Uuid
+  planId    String   @map("plan_id") @db.Uuid
+  version   Int
+  isCurrent Boolean  @default(false) @map("is_current")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  plan         Plan              @relation(fields: [planId], references: [id], onDelete: Restrict)
+  entitlements PlanEntitlement[]
+  subscriptions Subscription[]
+
+  @@unique([planId, version])
+  @@map("plan_versions")
+}
+
+model ModuleCatalog {
+  id          String              @id @default(uuid()) @db.Uuid
+  code        String              @unique
+  name        String
+  description String?
+  status      ModuleCatalogStatus @default(ACTIVE)
+  configSchema Json?              @map("config_schema")
+  createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  planEntitlements  PlanEntitlement[]
+  tenantEntitlements TenantEntitlement[]
+  subscriptionItems SubscriptionItem[]
+
+  @@map("module_catalog")
+}
+
+model PlanEntitlement {
+  id              String  @id @default(uuid()) @db.Uuid
+  planVersionId   String  @map("plan_version_id") @db.Uuid
+  moduleId        String  @map("module_id") @db.Uuid
+  capability      String
+  limitValue      Int?    @map("limit_value")
+  limitPeriodDays Int?    @map("limit_period_days")
+
+  planVersion PlanVersion   @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
+  module      ModuleCatalog @relation(fields: [moduleId], references: [id], onDelete: Restrict)
+
+  @@unique([planVersionId, moduleId, capability])
+  @@map("plan_entitlements")
+}
+
+model Subscription {
+  id            String             @id @default(uuid()) @db.Uuid
+  tenantId      String             @map("tenant_id") @db.Uuid
+  planVersionId String             @map("plan_version_id") @db.Uuid
+  status        SubscriptionStatus @default(TRIAL)
+  startsAt      DateTime           @map("starts_at") @db.Timestamptz(6)
+  endsAt        DateTime?          @map("ends_at") @db.Timestamptz(6)
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  planVersion PlanVersion @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
+  items       SubscriptionItem[]
+
+  @@index([tenantId])
+  @@map("subscriptions")
+}
+
+model SubscriptionItem {
+  id             String @id @default(uuid()) @db.Uuid
+  subscriptionId String @map("subscription_id") @db.Uuid
+  moduleId       String @map("module_id") @db.Uuid
+  quantity       Int    @default(1)
+  amountInCents  Int    @map("amount_in_cents")
+  currency       String @default("BRL") @db.Char(3)
+
+  subscription Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  module       ModuleCatalog @relation(fields: [moduleId], references: [id], onDelete: Restrict)
+
+  @@map("subscription_items")
+}
+
+model BillingWebhookEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  provider    String
+  externalId  String   @map("external_id")
+  payload     Json
+  processedAt DateTime? @map("processed_at") @db.Timestamptz(6)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([provider, externalId])
+  @@map("billing_webhook_events")
+}
+
+model PlatformAuditLog {
+  id         String    @id @default(uuid()) @db.Uuid
+  actorType  ActorType @map("actor_type")
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  action     String
+  resourceType String  @map("resource_type")
+  resourceId String?  @map("resource_id") @db.Uuid
+  requestId  String?  @map("request_id")
+  metadata   Json?
+  occurredAt DateTime  @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  @@index([occurredAt])
+  @@map("platform_audit_logs")
+}
+
+// ─── Authorization (global catalog + tenant assignments) ─────────────────────
+
+model Permission {
+  id          String @id @default(uuid()) @db.Uuid
+  code        String @unique
+  description String
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RoleTemplate {
+  id          String @id @default(uuid()) @db.Uuid
+  code        String @unique
+  name        String
+  scope       ScopeType @default(TENANT)
+  isPlatform  Boolean @default(false) @map("is_platform")
+
+  tenantRoles TenantRole[]
+
+  @@map("role_templates")
+}
+
+// ─── Tenant-scoped ───────────────────────────────────────────────────────────
+
+model Membership {
+  id        String           @id @default(uuid()) @db.Uuid
+  tenantId  String           @map("tenant_id") @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  status    MembershipStatus @default(INVITED)
+  invitedAt DateTime?        @map("invited_at") @db.Timestamptz(6)
+  joinedAt  DateTime?        @map("joined_at") @db.Timestamptz(6)
+  removedAt DateTime?        @map("removed_at") @db.Timestamptz(6)
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  roleAssignments MembershipRoleAssignment[]
+  groupMemberships GroupMembership[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, userId])
+  @@index([userId])
+  @@map("memberships")
+}
+
+model TenantRole {
+  id             String  @id @default(uuid()) @db.Uuid
+  tenantId       String  @map("tenant_id") @db.Uuid
+  roleTemplateId String? @map("role_template_id") @db.Uuid
+  code           String
+  name           String
+  isSystem       Boolean @default(false) @map("is_system")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  roleTemplate RoleTemplate? @relation(fields: [roleTemplateId], references: [id], onDelete: SetNull)
+
+  permissions     RolePermission[]
+  roleAssignments MembershipRoleAssignment[]
+  invitationRoles InvitationRole[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, code])
+  @@map("tenant_roles")
+}
+
+model RolePermission {
+  id           String @id @default(uuid()) @db.Uuid
+  tenantId     String @map("tenant_id") @db.Uuid
+  tenantRoleId String @map("tenant_role_id") @db.Uuid
+  permissionId String @map("permission_id") @db.Uuid
+
+  tenantRole TenantRole @relation(fields: [tenantId, tenantRoleId], references: [tenantId, id], onDelete: Restrict)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantRoleId, permissionId])
+  @@map("role_permissions")
+}
+
+model MembershipRoleAssignment {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  membershipId String    @map("membership_id") @db.Uuid
+  tenantRoleId String    @map("tenant_role_id") @db.Uuid
+  scopeType    ScopeType @map("scope_type") @default(TENANT)
+  scopeId      String?   @map("scope_id") @db.Uuid
+  startsAt     DateTime  @default(now()) @map("starts_at") @db.Timestamptz(6)
+  endsAt       DateTime? @map("ends_at") @db.Timestamptz(6)
+  assignedBy   String?   @map("assigned_by") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  membership Membership @relation(fields: [tenantId, membershipId], references: [tenantId, id], onDelete: Restrict)
+  tenantRole TenantRole @relation(fields: [tenantId, tenantRoleId], references: [tenantId, id], onDelete: Restrict)
+
+  @@index([membershipId])
+  @@map("membership_role_assignments")
+}
+
+model Invitation {
+  id          String           @id @default(uuid()) @db.Uuid
+  tenantId    String           @map("tenant_id") @db.Uuid
+  email       String           @db.Citext
+  tokenHash   String           @map("token_hash")
+  status      InvitationStatus @default(PENDING)
+  expiresAt   DateTime         @map("expires_at") @db.Timestamptz(6)
+  invitedBy   String           @map("invited_by") @db.Uuid
+  acceptedAt  DateTime?        @map("accepted_at") @db.Timestamptz(6)
+  revokedAt   DateTime?        @map("revoked_at") @db.Timestamptz(6)
+  resendCount Int              @default(0) @map("resend_count")
+  lastSentAt  DateTime?        @map("last_sent_at") @db.Timestamptz(6)
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  roles  InvitationRole[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, email])
+  @@map("invitations")
+}
+
+model InvitationRole {
+  id           String @id @default(uuid()) @db.Uuid
+  tenantId     String @map("tenant_id") @db.Uuid
+  invitationId String @map("invitation_id") @db.Uuid
+  tenantRoleId String @map("tenant_role_id") @db.Uuid
+
+  invitation Invitation @relation(fields: [tenantId, invitationId], references: [tenantId, id], onDelete: Restrict)
+  tenantRole TenantRole @relation(fields: [tenantId, tenantRoleId], references: [tenantId, id], onDelete: Restrict)
+
+  @@map("invitation_roles")
+}
+
+model Group {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  type      GroupType
+  name      String
+  code      String?
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  members     GroupMembership[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, code])
+  @@map("groups")
+}
+
+model GroupMembership {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  groupId      String   @map("group_id") @db.Uuid
+  membershipId String   @map("membership_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  group      Group      @relation(fields: [tenantId, groupId], references: [tenantId, id], onDelete: Restrict)
+  membership Membership @relation(fields: [tenantId, membershipId], references: [tenantId, id], onDelete: Restrict)
+
+  @@unique([tenantId, groupId, membershipId])
+  @@map("group_memberships")
+}
+
+model TenantEntitlement {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  moduleId   String   @map("module_id") @db.Uuid
+  capability String
+  isEnabled  Boolean  @default(true) @map("is_enabled")
+  limitValue Int?     @map("limit_value")
+  source     String   @default("subscription")
+  startsAt   DateTime @default(now()) @map("starts_at") @db.Timestamptz(6)
+  endsAt     DateTime? @map("ends_at") @db.Timestamptz(6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  module ModuleCatalog @relation(fields: [moduleId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, moduleId, capability])
+  @@map("tenant_entitlements")
+}
+
+model UsageCounter {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  metricCode   String   @map("metric_code")
+  periodStart  DateTime @map("period_start") @db.Timestamptz(6)
+  periodEnd    DateTime @map("period_end") @db.Timestamptz(6)
+  currentValue Int      @default(0) @map("current_value")
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([tenantId, metricCode, periodStart])
+  @@map("usage_counters")
+}
+
+// ─── Educational domain (tenant-scoped) ────────────────────────────────────────
+
+model Course {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  slug      String
+  title     String
+  status    String   @default("active")
+  ownerId   String?  @map("owner_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  versions CourseVersion[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, slug])
+  @@map("courses")
+}
+
+model CourseVersion {
+  id        String              @id @default(uuid()) @db.Uuid
+  tenantId  String              @map("tenant_id") @db.Uuid
+  courseId  String              @map("course_id") @db.Uuid
+  version   Int
+  status    CourseVersionStatus @default(DRAFT)
+  publishedAt DateTime?         @map("published_at") @db.Timestamptz(6)
+  createdAt DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  course  Course         @relation(fields: [tenantId, courseId], references: [tenantId, id], onDelete: Restrict)
+  modules CourseModule[]
+  enrollments Enrollment[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, courseId, version])
+  @@map("course_versions")
+}
+
+model CourseModule {
+  id              String @id @default(uuid()) @db.Uuid
+  tenantId        String @map("tenant_id") @db.Uuid
+  courseVersionId String @map("course_version_id") @db.Uuid
+  title           String
+  sortOrder       Int    @map("sort_order") @default(0)
+
+  courseVersion CourseVersion @relation(fields: [tenantId, courseVersionId], references: [tenantId, id], onDelete: Restrict)
+  lessons       Lesson[]
+
+  @@unique([tenantId, id])
+  @@map("course_modules")
+}
+
+model Lesson {
+  id             String @id @default(uuid()) @db.Uuid
+  tenantId       String @map("tenant_id") @db.Uuid
+  courseModuleId String @map("course_module_id") @db.Uuid
+  title          String
+  sortOrder      Int    @map("sort_order") @default(0)
+
+  courseModule CourseModule @relation(fields: [tenantId, courseModuleId], references: [tenantId, id], onDelete: Restrict)
+
+  @@unique([tenantId, id])
+  @@map("lessons")
+}
+
+model Cohort {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  name      String
+  code      String?
+  startsAt  DateTime? @map("starts_at") @db.Timestamptz(6)
+  endsAt    DateTime? @map("ends_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  enrollments Enrollment[]
+
+  @@unique([tenantId, id])
+  @@map("cohorts")
+}
+
+model Enrollment {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  cohortId        String   @map("cohort_id") @db.Uuid
+  membershipId    String   @map("membership_id") @db.Uuid
+  courseVersionId String   @map("course_version_id") @db.Uuid
+  status          String   @default("active")
+  enrolledAt      DateTime @default(now()) @map("enrolled_at") @db.Timestamptz(6)
+
+  cohort        Cohort        @relation(fields: [tenantId, cohortId], references: [tenantId, id], onDelete: Restrict)
+  courseVersion CourseVersion @relation(fields: [tenantId, courseVersionId], references: [tenantId, id], onDelete: Restrict)
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, cohortId, membershipId, courseVersionId])
+  @@map("enrollments")
+}
+
+model LearningPath {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  title     String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([tenantId, id])
+  @@map("learning_paths")
+}
+
+// ─── Infrastructure (tenant-scoped where applicable) ─────────────────────────
+
+model AuditLog {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String?   @map("tenant_id") @db.Uuid
+  actorType          ActorType @map("actor_type")
+  actorUserId        String?   @map("actor_user_id") @db.Uuid
+  actorMembershipId  String?   @map("actor_membership_id") @db.Uuid
+  action             String
+  resourceType       String    @map("resource_type")
+  resourceId         String?   @map("resource_id") @db.Uuid
+  requestId          String?   @map("request_id")
+  traceId            String?   @map("trace_id")
+  source             String?
+  ipAddress          String?   @map("ip_address") @db.Inet
+  beforeData         Json?     @map("before_data")
+  afterData          Json?     @map("after_data")
+  metadata           Json?
+  occurredAt         DateTime  @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, occurredAt])
+  @@map("audit_logs")
+}
+
+model OutboxEvent {
+  id             String      @id @default(uuid()) @db.Uuid
+  tenantId       String?     @map("tenant_id") @db.Uuid
+  aggregateType  String      @map("aggregate_type")
+  aggregateId    String      @map("aggregate_id") @db.Uuid
+  eventType      String      @map("event_type")
+  eventVersion   Int         @default(1) @map("event_version")
+  payload        Json
+  occurredAt     DateTime    @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  availableAt    DateTime    @default(now()) @map("available_at") @db.Timestamptz(6)
+  publishedAt    DateTime?   @map("published_at") @db.Timestamptz(6)
+  attemptCount   Int         @default(0) @map("attempt_count")
+  lastError      String?     @map("last_error")
+  correlationId  String?     @map("correlation_id")
+  idempotencyKey String?     @map("idempotency_key")
+  status         OutboxStatus @default(PENDING)
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([status, availableAt])
+  @@map("outbox_events")
+}
+
+model InboxEvent {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String?  @map("tenant_id") @db.Uuid
+  source         String
+  externalId     String   @map("external_id")
+  payload        Json
+  processedAt    DateTime? @map("processed_at") @db.Timestamptz(6)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([source, externalId])
+  @@map("inbox_events")
+}
+
+model IdempotencyKey {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String?  @map("tenant_id") @db.Uuid
+  userId         String?  @map("user_id") @db.Uuid
+  route          String
+  key            String
+  payloadHash    String   @map("payload_hash")
+  responseStatus Int?     @map("response_status")
+  responseBody   Json?    @map("response_body")
+  expiresAt      DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([tenantId, route, key])
+  @@map("idempotency_keys")
+}
+
+model DeadLetterJob {
+  id             String           @id @default(uuid()) @db.Uuid
+  tenantId       String?          @map("tenant_id") @db.Uuid
+  originalQueue  String           @map("original_queue")
+  originalJobId  String           @map("original_job_id")
+  jobName        String           @map("job_name")
+  payload        Json
+  errorCode      String?          @map("error_code")
+  errorMessage   String?          @map("error_message")
+  attempts       Int              @default(0)
+  firstFailedAt  DateTime         @map("first_failed_at") @db.Timestamptz(6)
+  lastFailedAt   DateTime         @map("last_failed_at") @db.Timestamptz(6)
+  status         DeadLetterStatus @default(OPEN)
+  replayCount    Int              @default(0) @map("replay_count")
+  replayedBy     String?          @map("replayed_by") @db.Uuid
+  replayedAt     DateTime?        @map("replayed_at") @db.Timestamptz(6)
+  resolvedAt     DateTime?        @map("resolved_at") @db.Timestamptz(6)
+  resolutionNote String?          @map("resolution_note")
+
+  @@index([status, lastFailedAt])
+  @@map("dead_letter_jobs")
+}
+
+model File {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  storageKey   String   @map("storage_key")
+  originalName String   @map("original_name")
+  mimeType     String   @map("mime_type")
+  sizeBytes    BigInt   @map("size_bytes")
+  sha256       String?
+  status       String   @default("quarantine")
+  createdBy    String?  @map("created_by") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, storageKey])
+  @@map("files")
+}
+
+model UploadSession {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  storageKey  String   @map("storage_key")
+  mimeType    String   @map("mime_type")
+  maxSizeBytes BigInt  @map("max_size_bytes")
+  expiresAt   DateTime @map("expires_at") @db.Timestamptz(6)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+  createdBy   String   @map("created_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([tenantId, id])
+  @@map("upload_sessions")
+}
+
+model ApiKey {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String
+  prefix      String
+  secretHash  String    @map("secret_hash")
+  scopes      String[]
+  expiresAt   DateTime? @map("expires_at") @db.Timestamptz(6)
+  lastUsedAt  DateTime? @map("last_used_at") @db.Timestamptz(6)
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdBy   String    @map("created_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([tenantId, id])
+  @@unique([prefix])
+  @@map("api_keys")
+}
+
+model PrivacyRequest {
+  id        String               @id @default(uuid()) @db.Uuid
+  tenantId  String               @map("tenant_id") @db.Uuid
+  userId    String               @map("user_id") @db.Uuid
+  type      PrivacyRequestType
+  status    PrivacyRequestStatus @default(RECEIVED)
+  createdAt DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([tenantId, id])
+  @@map("privacy_requests")
+}

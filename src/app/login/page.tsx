@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import { ArrowLeft } from "lucide-react";
 import { eduvyAssets } from "@/config/eduvy-assets";
+import { loginCopy } from "@/data/auth";
 import { LoginForm } from "@/components/auth/login-form";
 import { EduvyIllustration, EduvyLogoImage } from "@/components/brand/eduvy-image";
 
@@ -37,11 +39,13 @@ export default function LoginPage() {
             </Link>
 
             <div className="rounded-[var(--radius-lg)] border border-border bg-surface p-6 shadow-card sm:p-8">
-              <LoginForm />
+              <Suspense fallback={<div className="h-40 animate-pulse rounded-xl bg-background-light" />}>
+                <LoginForm />
+              </Suspense>
             </div>
 
             <p className="mt-5 text-center text-[11px] leading-relaxed text-text-muted">
-              Produto conceitual — login demonstrativo, sem autenticação real.
+              {loginCopy.demoNotice}
             </p>
           </div>
         </div>
