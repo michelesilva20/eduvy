@@ -11,9 +11,20 @@ export const loginCopy = {
   noAccount: "Ainda não tem uma plataforma?",
   createPlatform: "Criar minha plataforma",
   demoNotice:
-    "Use owner@horizonte.demo / Eduvy@2026! quando a API estiver rodando com seed.",
+    "Conta demo disponível abaixo quando a API estiver rodando com seed.",
+  quickAccess: {
+    title: "Acesso rápido",
+    subtitle: "Ambiente de desenvolvimento — seed local",
+    email: "owner@horizonte.demo",
+    password: "Eduvy@2026!",
+    label: "Proprietária demo",
+    fillButton: "Preencher campos",
+    submitButton: "Entrar agora",
+  },
   errors: {
     generic: "Não foi possível entrar. Verifique suas credenciais e tente novamente.",
+    apiOffline:
+      "A API não está respondendo. Abra o Docker Desktop, rode pnpm infra:up e depois pnpm dev:api em outro terminal.",
   },
   panelTitle: "Sua jornada de ensino continua aqui.",
   panelDescription:

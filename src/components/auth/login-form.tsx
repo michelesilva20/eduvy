@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Eye, EyeOff } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Sparkles, Zap } from "lucide-react";
 import { loginCopy } from "@/data/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,11 @@ interface FormErrors {
   email?: string;
   password?: string;
   form?: string;
+  apiOffline?: boolean;
 }
+
+const isDev = process.env.NODE_ENV === "development";
+const demo = loginCopy.quickAccess;
 
 function validateEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -25,10 +29,63 @@ export function LoginForm() {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [remember, setRemember] = useState(false);
+  const [remember, setRemember] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
+  const [showDemoPassword, setShowDemoPassword] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
+
+  const fillDemoCredentials = () => {
+    setEmail(demo.email);
+    setPassword(demo.password);
+    setRemember(true);
+    setErrors({});
+  };
+
+  const loginWithCredentials = async (inputEmail: string, inputPassword: string) => {
+    setIsLoading(true);
+    setErrors({});
+
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: inputEmail.trim(),
+          password: inputPassword,
+          rememberMe: remember,
+        }),
+      });
+
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as {
+          message?: string;
+          code?: string;
+        } | null;
+        const apiOffline = response.status === 503 || body?.code === "API_OFFLINE";
+        setErrors({
+          form: apiOffline
+            ? (body?.message ?? loginCopy.errors.apiOffline)
+            : (body?.message ?? loginCopy.errors.generic),
+          apiOffline,
+        });
+        return;
+      }
+
+      const next = searchParams.get("next");
+      router.push(next?.startsWith("/app") ? next : "/app");
+      router.refresh();
+    } catch {
+      setErrors({ form: loginCopy.errors.generic });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleQuickLogin = async () => {
+    fillDemoCredentials();
+    await loginWithCredentials(demo.email, demo.password);
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -50,36 +107,7 @@ export function LoginForm() {
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
-    setIsLoading(true);
-    setErrors({});
-
-    try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: email.trim(),
-          password,
-          rememberMe: remember,
-        }),
-      });
-
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as { message?: string } | null;
-        setErrors({
-          form: body?.message ?? loginCopy.errors.generic,
-        });
-        return;
-      }
-
-      const next = searchParams.get("next");
-      router.push(next?.startsWith("/app") ? next : "/app");
-      router.refresh();
-    } catch {
-      setErrors({ form: loginCopy.errors.generic });
-    } finally {
-      setIsLoading(false);
-    }
+    await loginWithCredentials(email, password);
   };
 
   return (
@@ -93,12 +121,95 @@ export function LoginForm() {
         </p>
       </div>
 
+      {isDev && (
+        <div className="mb-6 overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/[0.07] to-secondary/[0.04]">
+          <div className="flex items-start gap-3 border-b border-primary/10 px-4 py-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Zap className="size-4" aria-hidden />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="font-[family-name:var(--font-sora)] text-sm font-bold text-[#3d3654]">
+                {demo.title}
+              </p>
+              <p className="text-xs text-text-muted">{demo.subtitle}</p>
+            </div>
+          </div>
+
+          <div className="space-y-2 px-4 py-3">
+            <div className="rounded-xl border border-border/80 bg-surface/80 px-3 py-2.5">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                {demo.label}
+              </p>
+              <dl className="mt-1.5 space-y-1 font-mono text-xs text-[#3d3654]">
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                  <dt className="text-text-muted">E-mail</dt>
+                  <dd className="font-semibold">{demo.email}</dd>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                  <dt className="text-text-muted">Senha</dt>
+                  <dd className="font-semibold">
+                    {showDemoPassword ? demo.password : "••••••••••"}
+                  </dd>
+                </div>
+              </dl>
+              <button
+                type="button"
+                onClick={() => setShowDemoPassword((prev) => !prev)}
+                className="focus-ring mt-2 text-[11px] font-semibold text-primary hover:text-primary-bright"
+              >
+                {showDemoPassword ? "Ocultar senha" : "Mostrar senha"}
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-10 flex-1"
+                disabled={isLoading}
+                onClick={fillDemoCredentials}
+              >
+                {demo.fillButton}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="h-10 flex-1"
+                disabled={isLoading}
+                onClick={() => void handleQuickLogin()}
+              >
+                <Sparkles className="size-4" aria-hidden />
+                {isLoading ? "Entrando…" : demo.submitButton}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {errors.form && (
         <div
           role="alert"
-          className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          className={cn(
+            "mb-6 rounded-2xl border px-4 py-3 text-sm",
+            errors.apiOffline
+              ? "border-amber-200 bg-amber-50 text-amber-950"
+              : "border-red-200 bg-red-50 text-red-700",
+          )}
         >
-          {errors.form}
+          <p>{errors.form}</p>
+          {errors.apiOffline && (
+            <ol className="mt-3 list-decimal space-y-1 pl-4 text-xs leading-relaxed opacity-90">
+              <li>Abra o Docker Desktop</li>
+              <li>
+                No terminal: <code className="rounded bg-amber-100/80 px-1">pnpm infra:up</code>
+              </li>
+              <li>
+                Em outro terminal: <code className="rounded bg-amber-100/80 px-1">pnpm dev:api</code>
+              </li>
+              <li>Tente entrar novamente</li>
+            </ol>
+          )}
         </div>
       )}
 

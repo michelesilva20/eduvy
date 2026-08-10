@@ -6,7 +6,18 @@ type ApiFetchOptions = RequestInit & {
   bffOnly?: boolean;
 };
 
-export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<Response> {
+export class ApiUnavailableError extends Error {
+  readonly code = "API_OFFLINE";
+
+  constructor() {
+    super(
+      "A API não está respondendo. Abra outro terminal na raiz do projeto e rode: pnpm dev:api",
+    );
+    this.name = "ApiUnavailableError";
+  }
+}
+
+export async function apiFetch(path: string, options: ApiFetchOptions = {}): Promise<Response> {
   const env = getWebAuthEnv();
   const headers = new Headers(options.headers);
 
@@ -22,11 +33,15 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
     headers.set("Authorization", `Bearer ${options.accessToken}`);
   }
 
-  return fetch(`${env.EDUVY_API_URL}${path}`, {
-    ...options,
-    headers,
-    cache: "no-store",
-  });
+  try {
+    return await fetch(`${env.EDUVY_API_URL}${path}`, {
+      ...options,
+      headers,
+      cache: "no-store",
+    });
+  } catch {
+    throw new ApiUnavailableError();
+  }
 }
 
 export async function readApiError(response: Response) {

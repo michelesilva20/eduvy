@@ -23,8 +23,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR" className={`${sora.variable} ${nunitoSans.variable} scroll-smooth`}>
-      <body className="min-h-screen bg-background-light font-[family-name:var(--font-nunito)] text-text-dark antialiased">
+    <html
+      lang="pt-BR"
+      className={`${sora.variable} ${nunitoSans.variable} scroll-smooth`}
+      suppressHydrationWarning
+    >
+      <body
+        className="min-h-screen bg-background-light font-[family-name:var(--font-nunito)] text-text-dark antialiased"
+        suppressHydrationWarning
+      >
         <a href="#conteudo-principal" className="skip-link">
           Ir para o conteúdo principal
         </a>
