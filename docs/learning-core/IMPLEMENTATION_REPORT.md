@@ -5,12 +5,20 @@
 ```text
 Branch: feat/learning-core-1
 Base commit: 58635a17dcd8bf6a78d71863e828c4c6210a9446
-Current commit: d6a7095
+Current commit: f13a8f4
 Commits created:
   - 4e6dee1 docs(learning-core): add project overview and Gate 0/1 documentation
   - 5779d4d feat(courses): enrich course schema, contracts and RBAC seed
   - 5405fb6 feat(courses): add tenant-scoped course domain and lifecycle API
   - d6a7095 feat(courses): integrate real course management UI and BFF
+  - 76ae976 feat(database): add learning-core domain models through assessments
+  - e1917d0 feat(content): add course modules, lessons and builder UI
+  - b940c96 feat(people): add students and instructors management
+  - dcbfd15 feat(cohorts): implement cohort management
+  - 5796386 feat(enrollments): implement student enrollment workflow
+  - abdb6ea feat(progress): add student player and instructor cohort progress
+  - 05eb6d9 feat(assessments): add assessment domain foundation
+  - f13a8f4 docs(learning-core): document gates 2-8 and final status
 ```
 
 ## Gate 0 — Baseline
