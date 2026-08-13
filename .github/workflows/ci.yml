@@ -71,6 +71,16 @@ jobs:
       - name: Build packages
         run: pnpm build:packages
 
+      - name: Enable Postgres extensions
+        env:
+          DATABASE_URL: ${{ env.DATABASE_MIGRATION_URL }}
+        run: >
+          node -e "const {Client}=require('pg');
+          (async()=>{const c=new Client({connectionString:process.env.DATABASE_URL});
+          await c.connect();
+          await c.query('CREATE EXTENSION IF NOT EXISTS citext');
+          await c.end();})()"
+
       - name: Prepare database (migrate + roles + RLS)
         env:
           DATABASE_URL: ${{ env.DATABASE_MIGRATION_URL }}
