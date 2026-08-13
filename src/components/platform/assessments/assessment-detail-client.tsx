@@ -11,6 +11,7 @@ import type {
   ResultVisibilityCode,
 } from "@eduvy/contracts";
 import { ArrowLeft } from "lucide-react";
+import { AssessmentResultsPanel } from "@/components/platform/assessments/assessment-results-panel";
 import { PageHeader } from "@/components/platform/shared/page-header";
 import { StatusBadge } from "@/components/platform/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -340,6 +341,8 @@ export function AssessmentDetailClient({
           </div>
         ) : null}
       </section>
+
+      <AssessmentResultsPanel assessmentId={assessment.id} />
 
       <section className="mb-6 space-y-3 rounded-[var(--radius-card)] border border-border bg-surface p-5">
         <h2 className="text-sm font-bold uppercase tracking-wide text-text-muted">Questões</h2>
