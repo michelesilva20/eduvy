@@ -54,7 +54,12 @@ Runtime role:           eduvy_app — NOBYPASSRLS verified
 
 ### Commits (Gate 8.5)
 
-Ver `git log` na branch após commits.
+```text
+6ecacec fix(database): enforce learning core integrity constraints
+481d01d fix(rls): fail-closed policies for nullable tenant tables
+f2c494a test(rls): harden learning core tenant isolation
+5867d5f docs(assessments): document assessment engine gate 8.5 hardening
+```
 
 ---
 
