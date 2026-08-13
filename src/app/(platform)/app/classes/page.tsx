@@ -1,24 +1,15 @@
 import { platformMetadata } from "@/lib/platform/metadata";
-import { PageHeader } from "@/components/platform/shared/page-header";
-import { EmptyState } from "@/components/platform/shared/empty-state";
+import { fetchCohorts } from "@/lib/cohorts/server";
+import { ClassesPageClient } from "@/components/platform/classes/classes-page-client";
 
 export const metadata = platformMetadata("Turmas");
 
-export default function ClassesPage() {
-  return (
-    <>
-      <PageHeader
-        title="Turmas"
-        description="Organize turmas, acompanhe progresso e participação dos alunos."
-        actionLabel="Nova turma"
-        actionHref="/app/classes"
-      />
-      <EmptyState
-        title="Nenhuma turma criada"
-        description="Agrupe alunos por curso, período ou objetivo de aprendizagem."
-        actionLabel="Nova turma"
-        actionHref="/app/classes"
-      />
-    </>
-  );
+export default async function ClassesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ search?: string; status?: string; page?: string }>;
+}) {
+  const params = await searchParams;
+  const { data, error } = await fetchCohorts(params);
+  return <ClassesPageClient initialData={data} error={error} />;
 }

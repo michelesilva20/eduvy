@@ -41,6 +41,10 @@ export function StatusBadge({ status }: { status: string }) {
     trial: "warning",
     included: "success",
     in_review: "info",
+    open: "info",
+    in_progress: "success",
+    completed: "success",
+    cancelled: "danger",
   };
   const labels: Record<string, string> = {
     active: "Ativo",
@@ -54,6 +58,10 @@ export function StatusBadge({ status }: { status: string }) {
     trial: "Em teste",
     included: "Incluído",
     in_review: "Em revisão",
+    open: "Aberta",
+    in_progress: "Em andamento",
+    completed: "Concluída",
+    cancelled: "Cancelada",
   };
   return (
     <Badge variant={map[normalized] ?? "muted"}>
