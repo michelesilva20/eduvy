@@ -1,9 +1,19 @@
 import {
+  AssessmentStatus,
+  AttemptStatus,
+  CohortInstructorRole,
+  CohortStatus,
   CourseStatus,
   CourseVisibility,
   CourseVersionStatus,
+  EnrollmentStatus,
+  LessonContentType,
+  LessonProgressStatus,
+  LessonStatus,
+  LessonType,
   Prisma,
   PrismaClient,
+  QuestionType,
 } from "@prisma/client";
 
 export type TenantContext = {
@@ -36,9 +46,19 @@ export class TenantDatabase {
 }
 
 export {
+  AssessmentStatus,
+  AttemptStatus,
+  CohortInstructorRole,
+  CohortStatus,
   CourseStatus,
   CourseVisibility,
   CourseVersionStatus,
+  EnrollmentStatus,
+  LessonContentType,
+  LessonProgressStatus,
+  LessonStatus,
+  LessonType,
   Prisma,
   PrismaClient,
+  QuestionType,
 };
