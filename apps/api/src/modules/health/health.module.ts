@@ -3,6 +3,7 @@ import { Controller, Get } from "@nestjs/common";
 import type { ApiEnv } from "@eduvy/config";
 import { PrismaClient } from "@eduvy/database";
 import Redis from "ioredis";
+import { Public } from "../../common/auth/decorators";
 import { API_ENV } from "../../common/config/config.module";
 import { InjectPrisma } from "../../common/database/database.module";
 
@@ -17,11 +18,13 @@ export class HealthController {
     this.redis = new Redis(env.REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 1 });
   }
 
+  @Public()
   @Get("live")
   live() {
     return { status: "ok", service: "api", timestamp: new Date().toISOString() };
   }
 
+  @Public()
   @Get("ready")
   async ready() {
     await this.prisma.$queryRaw`SELECT 1`;
