@@ -3,8 +3,15 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { AssessmentDto, QuestionTypeCode } from "@eduvy/contracts";
+import type {
+  AssessmentAssignmentDto,
+  AssessmentDto,
+  CohortListItemDto,
+  QuestionTypeCode,
+  ResultVisibilityCode,
+} from "@eduvy/contracts";
 import { ArrowLeft } from "lucide-react";
+import { AssessmentResultsPanel } from "@/components/platform/assessments/assessment-results-panel";
 import { PageHeader } from "@/components/platform/shared/page-header";
 import { StatusBadge } from "@/components/platform/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,7 +24,22 @@ const QUESTION_TYPES: Array<{ value: QuestionTypeCode; label: string }> = [
   { value: "SHORT_TEXT", label: "Resposta curta" },
 ];
 
-export function AssessmentDetailClient({ assessment }: { assessment: AssessmentDto }) {
+const RESULT_OPTIONS: Array<{ value: ResultVisibilityCode; label: string }> = [
+  { value: "AFTER_SUBMISSION", label: "Após o envio" },
+  { value: "IMMEDIATE", label: "Imediato" },
+  { value: "AFTER_DEADLINE", label: "Após o prazo" },
+  { value: "MANUAL", label: "Liberação manual" },
+];
+
+export function AssessmentDetailClient({
+  assessment,
+  assignments,
+  cohorts,
+}: {
+  assessment: AssessmentDto;
+  assignments: AssessmentAssignmentDto[];
+  cohorts: CohortListItemDto[];
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +50,17 @@ export function AssessmentDetailClient({ assessment }: { assessment: AssessmentD
   const [optionA, setOptionA] = useState("Alternativa A");
   const [optionB, setOptionB] = useState("Alternativa B");
   const [correct, setCorrect] = useState<"A" | "B">("A");
+
+  const [cohortId, setCohortId] = useState(cohorts[0]?.id ?? "");
+  const [attemptsAllowed, setAttemptsAllowed] = useState("2");
+  const [timeLimitMinutes, setTimeLimitMinutes] = useState("");
+  const [availableUntil, setAvailableUntil] = useState("");
+  const [resultVisibility, setResultVisibility] =
+    useState<ResultVisibilityCode>("AFTER_SUBMISSION");
+
+  const assignedCohortIds = new Set(assignments.map((a) => a.cohortId));
+  const availableCohorts = cohorts.filter((c) => !assignedCohortIds.has(c.id));
+  const questionsLocked = assessment.status === "PUBLISHED" && assignments.length > 0;
 
   async function runAction(path: string, success: string, method = "POST", body?: unknown) {
     setError(null);
@@ -111,6 +144,25 @@ export function AssessmentDetailClient({ assessment }: { assessment: AssessmentD
     });
   }
 
+  function createAssignment() {
+    if (!cohortId) {
+      setError("Selecione uma turma.");
+      return;
+    }
+    runAction(
+      `/api/assessments/${assessment.id}/assignments`,
+      "Avaliação atribuída à turma.",
+      "POST",
+      {
+        cohortId,
+        attemptsAllowed: attemptsAllowed ? Number(attemptsAllowed) : null,
+        timeLimitMinutes: timeLimitMinutes ? Number(timeLimitMinutes) : null,
+        availableUntil: availableUntil ? new Date(availableUntil).toISOString() : null,
+        resultVisibility,
+      },
+    );
+  }
+
   return (
     <>
       <div className="mb-4">
@@ -130,6 +182,10 @@ export function AssessmentDetailClient({ assessment }: { assessment: AssessmentD
         <span className="text-sm text-text-muted">
           {assessment.questionsCount}{" "}
           {assessment.questionsCount === 1 ? "questão" : "questões"}
+        </span>
+        <span className="text-sm text-text-muted">
+          {assignments.length}{" "}
+          {assignments.length === 1 ? "atribuição" : "atribuições"}
         </span>
       </div>
 
@@ -169,6 +225,126 @@ export function AssessmentDetailClient({ assessment }: { assessment: AssessmentD
       ) : null}
 
       <section className="mb-6 space-y-3 rounded-[var(--radius-card)] border border-border bg-surface p-5">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-text-muted">
+          Atribuições
+        </h2>
+        {assessment.status !== "PUBLISHED" ? (
+          <p className="text-sm text-text-muted">
+            Publique a avaliação para atribuí-la a turmas.
+          </p>
+        ) : null}
+
+        {assignments.length === 0 ? (
+          <p className="text-sm text-text-muted">
+            Ainda não há atribuições. Os alunos só verão a avaliação após o vínculo com a
+            turma.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {assignments.map((item) => (
+              <li
+                key={item.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+              >
+                <div>
+                  <p className="font-medium text-text-primary">{item.cohortName}</p>
+                  <p className="text-xs text-text-muted">
+                    {item.isActive ? "Ativa" : "Inativa"} · tentativas{" "}
+                    {item.attemptsAllowed ?? "ilimitadas"} · resultado{" "}
+                    {RESULT_OPTIONS.find((o) => o.value === item.resultVisibility)?.label}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={pending}
+                  onClick={() =>
+                    runAction(
+                      `/api/assessment-assignments/${item.id}`,
+                      item.isActive ? "Atribuição desativada." : "Atribuição reativada.",
+                      "PATCH",
+                      { isActive: !item.isActive },
+                    )
+                  }
+                >
+                  {item.isActive ? "Desativar" : "Reativar"}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {assessment.status === "PUBLISHED" && availableCohorts.length > 0 ? (
+          <div className="mt-4 grid gap-3 border-t border-border pt-4 md:grid-cols-2">
+            <label className="block space-y-1.5">
+              <span className="text-sm font-semibold">Turma</span>
+              <select
+                value={cohortId}
+                onChange={(e) => setCohortId(e.target.value)}
+                className="h-10 w-full rounded-[var(--radius-input)] border border-border bg-background px-3 text-sm"
+              >
+                {availableCohorts.map((cohort) => (
+                  <option key={cohort.id} value={cohort.id}>
+                    {cohort.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block space-y-1.5">
+              <span className="text-sm font-semibold">Tentativas permitidas</span>
+              <Input
+                type="number"
+                min={1}
+                value={attemptsAllowed}
+                onChange={(e) => setAttemptsAllowed(e.target.value)}
+              />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="text-sm font-semibold">Tempo limite (min)</span>
+              <Input
+                type="number"
+                min={1}
+                value={timeLimitMinutes}
+                onChange={(e) => setTimeLimitMinutes(e.target.value)}
+                placeholder="Opcional"
+              />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="text-sm font-semibold">Disponível até</span>
+              <Input
+                type="datetime-local"
+                value={availableUntil}
+                onChange={(e) => setAvailableUntil(e.target.value)}
+              />
+            </label>
+            <label className="block space-y-1.5 md:col-span-2">
+              <span className="text-sm font-semibold">Visibilidade do resultado</span>
+              <select
+                value={resultVisibility}
+                onChange={(e) =>
+                  setResultVisibility(e.target.value as ResultVisibilityCode)
+                }
+                className="h-10 w-full max-w-md rounded-[var(--radius-input)] border border-border bg-background px-3 text-sm"
+              >
+                {RESULT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="md:col-span-2">
+              <Button disabled={pending || !cohortId} onClick={createAssignment}>
+                Atribuir à turma
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </section>
+
+      <AssessmentResultsPanel assessmentId={assessment.id} />
+
+      <section className="mb-6 space-y-3 rounded-[var(--radius-card)] border border-border bg-surface p-5">
         <h2 className="text-sm font-bold uppercase tracking-wide text-text-muted">Questões</h2>
         {assessment.questions.length === 0 ? (
           <p className="text-sm text-text-muted">Nenhuma questão vinculada ainda.</p>
@@ -187,7 +363,7 @@ export function AssessmentDetailClient({ assessment }: { assessment: AssessmentD
                     {item.question.type} · {item.question.points} pt
                   </p>
                 </div>
-                {assessment.status !== "ARCHIVED" ? (
+                {assessment.status !== "ARCHIVED" && !questionsLocked ? (
                   <Button
                     size="sm"
                     variant="ghost"
@@ -208,9 +384,14 @@ export function AssessmentDetailClient({ assessment }: { assessment: AssessmentD
             ))}
           </ol>
         )}
+        {questionsLocked && assignments.length > 0 ? (
+          <p className="text-xs text-text-muted">
+            Questões bloqueadas: avaliação publicada com atribuições ou tentativas.
+          </p>
+        ) : null}
       </section>
 
-      {assessment.status !== "ARCHIVED" ? (
+      {assessment.status !== "ARCHIVED" && !(assignments.length > 0 && assessment.status === "PUBLISHED") ? (
         <section className="space-y-3 rounded-[var(--radius-card)] border border-border bg-surface p-5">
           <h2 className="text-sm font-bold uppercase tracking-wide text-text-muted">
             Adicionar questão

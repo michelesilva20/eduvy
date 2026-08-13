@@ -47,6 +47,10 @@ export const PERMISSIONS = {
   ASSESSMENTS_CREATE: "assessments.create",
   ASSESSMENTS_UPDATE: "assessments.update",
   ASSESSMENTS_PUBLISH: "assessments.publish",
+  ASSESSMENTS_ATTEMPT: "assessments.attempt",
+  ASSESSMENTS_ASSIGN: "assessments.assign",
+  ASSESSMENTS_RESULTS_READ: "assessments.results.read",
+  ASSESSMENTS_GRADE: "assessments.grade",
   AUDIT_READ: "audit.read",
   BILLING_READ: "billing.read",
   ENTITLEMENTS_READ: "entitlements.read",
@@ -653,4 +657,234 @@ export interface PaginatedAssessmentsDto {
     total: number;
     hasMore: boolean;
   };
+}
+
+export const ATTEMPT_STATUSES = {
+  IN_PROGRESS: "IN_PROGRESS",
+  SUBMITTED: "SUBMITTED",
+  GRADED: "GRADED",
+  EXPIRED: "EXPIRED",
+  CANCELLED: "CANCELLED",
+} as const;
+
+export type AttemptStatusCode =
+  (typeof ATTEMPT_STATUSES)[keyof typeof ATTEMPT_STATUSES];
+
+/** Public option — never includes isCorrect. */
+export interface StudentQuestionOptionDto {
+  id: string;
+  text: string;
+}
+
+/** Player-safe question — no answer key / explanation / correctAnswer. */
+export interface StudentQuestionDto {
+  id: string;
+  stem: string;
+  type: QuestionTypeCode;
+  options: StudentQuestionOptionDto[] | null;
+  points: number;
+  sortOrder: number;
+  pointsOverride: number | null;
+}
+
+export interface AttemptAnswerDto {
+  questionId: string;
+  selectedOptionIds: string[];
+  textAnswer: string | null;
+  answeredAt: string | null;
+}
+
+export interface AssessmentAttemptDto {
+  id: string;
+  assessmentId: string;
+  assessmentTitle: string;
+  membershipId: string;
+  enrollmentId: string | null;
+  attemptNumber: number;
+  status: AttemptStatusCode;
+  startedAt: string;
+  expiresAt: string | null;
+  submittedAt: string | null;
+  gradedAt: string | null;
+  score: number | null;
+  maxScore: number | null;
+  scorePercentage: number | null;
+  serverNow: string;
+  questions: StudentQuestionDto[];
+  answers: AttemptAnswerDto[];
+  answeredCount: number;
+  questionsCount: number;
+  timeLimitMinutes: number | null;
+  maxAttempts: number | null;
+  attemptsUsed: number;
+  pendingManualGrade: boolean;
+}
+
+export const RESULT_VISIBILITY = {
+  IMMEDIATE: "IMMEDIATE",
+  AFTER_SUBMISSION: "AFTER_SUBMISSION",
+  AFTER_DEADLINE: "AFTER_DEADLINE",
+  MANUAL: "MANUAL",
+} as const;
+
+export type ResultVisibilityCode =
+  (typeof RESULT_VISIBILITY)[keyof typeof RESULT_VISIBILITY];
+
+export interface AssessmentAssignmentDto {
+  id: string;
+  assessmentId: string;
+  assessmentTitle: string;
+  cohortId: string;
+  cohortName: string;
+  lessonId: string | null;
+  availableFrom: string | null;
+  availableUntil: string | null;
+  attemptsAllowed: number | null;
+  timeLimitMinutes: number | null;
+  required: boolean;
+  resultVisibility: ResultVisibilityCode;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AvailableAssessmentDto {
+  id: string;
+  assignmentId: string;
+  title: string;
+  description: string | null;
+  cohortId: string;
+  cohortName: string;
+  lessonId: string | null;
+  availableFrom: string | null;
+  availableUntil: string | null;
+  timeLimitMinutes: number | null;
+  maxAttempts: number | null;
+  attemptsUsed: number;
+  attemptsRemaining: number | null;
+  questionsCount: number;
+  required: boolean;
+  resultVisibility: ResultVisibilityCode;
+  currentAttemptId: string | null;
+  currentAttemptStatus: AttemptStatusCode | null;
+}
+
+export interface StudentAttemptResultDto {
+  attemptId: string;
+  assessmentId: string;
+  assessmentTitle: string;
+  assignmentId: string | null;
+  status: AttemptStatusCode;
+  attemptNumber: number;
+  maxAttempts: number | null;
+  score: number | null;
+  maxScore: number | null;
+  scorePercentage: number | null;
+  submittedAt: string | null;
+  gradedAt: string | null;
+  pendingManualGrade: boolean;
+  passed: boolean | null;
+  passingScore: number | null;
+  resultVisible: boolean;
+  resultVisibility: ResultVisibilityCode | null;
+}
+
+export const ASSESSMENT_RESULT_ROW_STATUSES = {
+  NOT_STARTED: "NOT_STARTED",
+  IN_PROGRESS: "IN_PROGRESS",
+  SUBMITTED: "SUBMITTED",
+  GRADED: "GRADED",
+  EXPIRED: "EXPIRED",
+} as const;
+
+export type AssessmentResultRowStatusCode =
+  (typeof ASSESSMENT_RESULT_ROW_STATUSES)[keyof typeof ASSESSMENT_RESULT_ROW_STATUSES];
+
+export interface AssessmentResultSummaryDto {
+  studentsCount: number;
+  completedCount: number;
+  pendingCount: number;
+  awaitingGradeCount: number;
+  averagePercentage: number | null;
+  highestPercentage: number | null;
+  lowestPercentage: number | null;
+}
+
+export interface AssessmentResultRowDto {
+  membershipId: string;
+  enrollmentId: string | null;
+  assignmentId: string | null;
+  cohortId: string | null;
+  cohortName: string | null;
+  studentFullName: string;
+  studentEmail: string;
+  status: AssessmentResultRowStatusCode;
+  attemptId: string | null;
+  attemptNumber: number | null;
+  attemptsUsed: number;
+  maxAttempts: number | null;
+  score: number | null;
+  maxScore: number | null;
+  scorePercentage: number | null;
+  submittedAt: string | null;
+  gradedAt: string | null;
+  pendingManualGrade: boolean;
+}
+
+export interface PaginatedAssessmentResultsDto {
+  assessmentId: string;
+  summary: AssessmentResultSummaryDto;
+  items: AssessmentResultRowDto[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    hasMore: boolean;
+  };
+}
+
+export interface AssessmentQuestionStatDto {
+  questionId: string;
+  stem: string;
+  type: QuestionTypeCode;
+  sortOrder: number;
+  answeredCount: number;
+  correctCount: number;
+  pendingManualCount: number;
+  correctPercentage: number | null;
+}
+
+export interface InstructorAttemptAnswerDto {
+  questionId: string;
+  stem: string;
+  type: QuestionTypeCode;
+  points: number;
+  sortOrder: number;
+  selectedOptionIds: string[];
+  textAnswer: string | null;
+  isCorrect: boolean | null;
+  pointsAwarded: number | null;
+  pendingManual: boolean;
+  options: Array<{ id: string; text: string; isCorrect: boolean }> | null;
+}
+
+export interface InstructorAttemptDetailDto {
+  attemptId: string;
+  assessmentId: string;
+  assessmentTitle: string;
+  membershipId: string;
+  studentFullName: string;
+  studentEmail: string;
+  assignmentId: string | null;
+  cohortName: string | null;
+  attemptNumber: number;
+  status: AttemptStatusCode;
+  score: number | null;
+  maxScore: number | null;
+  scorePercentage: number | null;
+  startedAt: string;
+  submittedAt: string | null;
+  gradedAt: string | null;
+  pendingManualGrade: boolean;
+  answers: InstructorAttemptAnswerDto[];
 }

@@ -5,6 +5,7 @@ export type CohortsQuery = {
   search?: string;
   status?: string;
   page?: string;
+  limit?: string;
 };
 
 export async function fetchCohorts(query: CohortsQuery = {}): Promise<{
@@ -15,7 +16,7 @@ export async function fetchCohorts(query: CohortsQuery = {}): Promise<{
   if (query.search) params.set("search", query.search);
   if (query.status && query.status !== "ALL") params.set("status", query.status);
   if (query.page) params.set("page", query.page);
-  params.set("limit", "20");
+  params.set("limit", query.limit ?? "20");
   const qs = params.toString();
 
   try {

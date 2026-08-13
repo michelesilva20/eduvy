@@ -43,6 +43,12 @@ export const platformNavSections: NavSection[] = [
       { id: "courses", label: "Cursos", href: "/app/courses", icon: BookOpen },
       { id: "classes", label: "Turmas", href: "/app/classes", icon: GraduationCap },
       { id: "learning", label: "Meus cursos", href: "/app/learning", icon: MonitorPlay },
+      {
+        id: "my-assessments",
+        label: "Minhas avaliações",
+        href: "/app/my-assessments",
+        icon: ClipboardCheck,
+      },
     ],
   },
   {

@@ -133,7 +133,15 @@ enum AttemptStatus {
   IN_PROGRESS
   SUBMITTED
   GRADED
+  EXPIRED
   CANCELLED
+}
+
+enum ResultVisibility {
+  IMMEDIATE
+  AFTER_SUBMISSION
+  AFTER_DEADLINE
+  MANUAL
 }
 
 enum GroupType {
@@ -461,6 +469,9 @@ model Membership {
 
   roleAssignments MembershipRoleAssignment[]
   groupMemberships GroupMembership[]
+  cohortInstructors CohortInstructor[]
+  enrollments     Enrollment[]
+  assessmentAttempts AssessmentAttempt[]
 
   @@unique([tenantId, id])
   @@unique([tenantId, userId])
@@ -665,6 +676,7 @@ model CourseVersion {
   cohorts Cohort[]
 
   @@unique([tenantId, id])
+  @@unique([tenantId, courseId, id])
   @@unique([tenantId, courseId, version])
   @@map("course_versions")
 }
@@ -707,6 +719,7 @@ model Lesson {
   courseModule CourseModule     @relation(fields: [tenantId, courseModuleId], references: [tenantId, id], onDelete: Restrict)
   contents     LessonContent[]
   progress     LessonProgress[]
+  assessmentAssignments AssessmentAssignment[]
 
   @@unique([tenantId, id])
   @@index([tenantId, courseModuleId, sortOrder])
@@ -752,9 +765,10 @@ model Cohort {
 
   tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   course        Course             @relation(fields: [tenantId, courseId], references: [tenantId, id], onDelete: Restrict)
-  courseVersion CourseVersion      @relation(fields: [tenantId, courseVersionId], references: [tenantId, id], onDelete: Restrict)
+  courseVersion CourseVersion      @relation(fields: [tenantId, courseId, courseVersionId], references: [tenantId, courseId, id], onDelete: Restrict)
   enrollments   Enrollment[]
   instructors   CohortInstructor[]
+  assessmentAssignments AssessmentAssignment[]
 
   @@unique([tenantId, id])
   @@unique([tenantId, code])
@@ -773,7 +787,8 @@ model CohortInstructor {
   assignedAt   DateTime             @default(now()) @map("assigned_at") @db.Timestamptz(6)
   assignedBy   String?              @map("assigned_by") @db.Uuid
 
-  cohort Cohort @relation(fields: [tenantId, cohortId], references: [tenantId, id], onDelete: Restrict)
+  cohort     Cohort     @relation(fields: [tenantId, cohortId], references: [tenantId, id], onDelete: Restrict)
+  membership Membership @relation(fields: [tenantId, membershipId], references: [tenantId, id], onDelete: Restrict)
 
   @@unique([tenantId, id])
   @@unique([tenantId, cohortId, membershipId])
@@ -797,7 +812,9 @@ model Enrollment {
 
   cohort        Cohort           @relation(fields: [tenantId, cohortId], references: [tenantId, id], onDelete: Restrict)
   courseVersion CourseVersion    @relation(fields: [tenantId, courseVersionId], references: [tenantId, id], onDelete: Restrict)
+  membership    Membership       @relation(fields: [tenantId, membershipId], references: [tenantId, id], onDelete: Restrict)
   lessonProgress LessonProgress[]
+  assessmentAttempts AssessmentAttempt[]
 
   @@unique([tenantId, id])
   @@unique([tenantId, cohortId, membershipId, courseVersionId])
@@ -882,14 +899,44 @@ model Assessment {
   createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  tenant    Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  questions AssessmentQuestion[]
-  attempts  AssessmentAttempt[]
+  tenant      Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  questions   AssessmentQuestion[]
+  attempts    AssessmentAttempt[]
+  assignments AssessmentAssignment[]
 
   @@unique([tenantId, id])
   @@index([tenantId, status])
   @@index([tenantId, createdAt(sort: Desc)])
   @@map("assessments")
+}
+
+model AssessmentAssignment {
+  id                String           @id @default(uuid()) @db.Uuid
+  tenantId          String           @map("tenant_id") @db.Uuid
+  assessmentId      String           @map("assessment_id") @db.Uuid
+  cohortId          String           @map("cohort_id") @db.Uuid
+  lessonId          String?          @map("lesson_id") @db.Uuid
+  availableFrom     DateTime?        @map("available_from") @db.Timestamptz(6)
+  availableUntil    DateTime?        @map("available_until") @db.Timestamptz(6)
+  attemptsAllowed   Int?             @map("attempts_allowed")
+  timeLimitMinutes  Int?             @map("time_limit_minutes")
+  required          Boolean          @default(false)
+  resultVisibility  ResultVisibility @default(AFTER_SUBMISSION) @map("result_visibility")
+  isActive          Boolean          @default(true) @map("is_active")
+  createdBy         String?          @map("created_by") @db.Uuid
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  assessment Assessment @relation(fields: [tenantId, assessmentId], references: [tenantId, id], onDelete: Restrict)
+  cohort     Cohort     @relation(fields: [tenantId, cohortId], references: [tenantId, id], onDelete: Restrict)
+  lesson     Lesson?    @relation(fields: [tenantId, lessonId], references: [tenantId, id], onDelete: Restrict)
+  attempts   AssessmentAttempt[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, assessmentId, cohortId])
+  @@index([tenantId, cohortId, isActive])
+  @@index([tenantId, assessmentId])
+  @@map("assessment_assignments")
 }
 
 model AssessmentQuestion {
@@ -914,19 +961,31 @@ model AssessmentAttempt {
   id               String        @id @default(uuid()) @db.Uuid
   tenantId         String        @map("tenant_id") @db.Uuid
   assessmentId     String        @map("assessment_id") @db.Uuid
+  assignmentId     String?       @map("assignment_id") @db.Uuid
   membershipId     String        @map("membership_id") @db.Uuid
+  enrollmentId     String?       @map("enrollment_id") @db.Uuid
+  attemptNumber    Int           @map("attempt_number")
   status           AttemptStatus @default(IN_PROGRESS)
   startedAt        DateTime      @default(now()) @map("started_at") @db.Timestamptz(6)
+  expiresAt        DateTime?     @map("expires_at") @db.Timestamptz(6)
   submittedAt      DateTime?     @map("submitted_at") @db.Timestamptz(6)
+  gradedAt         DateTime?     @map("graded_at") @db.Timestamptz(6)
+  score            Int?
+  maxScore         Int?          @map("max_score")
   scorePercentage  Int?          @map("score_percentage")
   createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  assessment Assessment     @relation(fields: [tenantId, assessmentId], references: [tenantId, id], onDelete: Restrict)
+  assessment Assessment           @relation(fields: [tenantId, assessmentId], references: [tenantId, id], onDelete: Restrict)
+  assignment AssessmentAssignment? @relation(fields: [tenantId, assignmentId], references: [tenantId, id], onDelete: Restrict)
+  membership Membership           @relation(fields: [tenantId, membershipId], references: [tenantId, id], onDelete: Restrict)
+  enrollment Enrollment?          @relation(fields: [tenantId, enrollmentId], references: [tenantId, id], onDelete: Restrict)
   answers    AttemptAnswer[]
 
   @@unique([tenantId, id])
+  @@unique([tenantId, assessmentId, membershipId, attemptNumber])
   @@index([tenantId, assessmentId, membershipId])
+  @@index([tenantId, assignmentId, membershipId])
   @@index([tenantId, membershipId, status])
   @@map("assessment_attempts")
 }

@@ -395,6 +395,19 @@ export class AssessmentsService {
         message: "Avaliações arquivadas não podem ser alteradas.",
       });
     }
+    if (row.status === AssessmentStatus.PUBLISHED) {
+      const [assignments, attempts] = await Promise.all([
+        tx.assessmentAssignment.count({ where: { assessmentId: row.id } }),
+        tx.assessmentAttempt.count({ where: { assessmentId: row.id } }),
+      ]);
+      if (assignments > 0 || attempts > 0) {
+        throw new BadRequestException({
+          code: "ASSESSMENT_LOCKED",
+          message:
+            "Avaliação publicada com atribuições ou tentativas não pode ter questões alteradas.",
+        });
+      }
+    }
     return row;
   }
 

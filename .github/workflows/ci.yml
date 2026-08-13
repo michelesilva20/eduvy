@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - feat/assessment-engine-1
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: PR validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: eduvy
+          POSTGRES_USER: eduvy_migration
+          POSTGRES_PASSWORD: eduvy_migration_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U eduvy_migration -d eduvy"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_MIGRATION_URL: postgresql://eduvy_migration:eduvy_migration_dev@localhost:5432/eduvy?schema=public
+      DATABASE_URL: postgresql://eduvy_app:eduvy_app_dev@localhost:5432/eduvy?schema=public
+      REDIS_URL: redis://localhost:6379
+      JWT_ACCESS_SECRET: ci-access-secret-min-32-chars!!!!!!
+      JWT_REFRESH_SECRET: ci-refresh-secret-min-32-chars!!!!!
+      BFF_SHARED_SECRET: ci-bff-shared-secret-min-32-chars!!
+      EDUVY_BFF_SECRET: ci-bff-shared-secret-min-32-chars!!
+      EDUVY_API_URL: http://localhost:4000/api/v1
+      NEXT_PUBLIC_API_URL: http://localhost:4000/api/v1
+      S3_ENDPOINT: http://localhost:9000
+      S3_ACCESS_KEY: eduvy_minio
+      S3_SECRET_KEY: eduvy_minio_dev_secret
+      NODE_ENV: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
+
+      - name: Build packages
+        run: pnpm build:packages
+
+      - name: Enable Postgres extensions
+        env:
+          DATABASE_URL: ${{ env.DATABASE_MIGRATION_URL }}
+        run: >
+          node -e "const {Client}=require('pg');
+          (async()=>{const c=new Client({connectionString:process.env.DATABASE_URL});
+          await c.connect();
+          await c.query('CREATE EXTENSION IF NOT EXISTS citext');
+          await c.end();})()"
+
+      - name: Prepare database (migrate + roles + RLS)
+        env:
+          DATABASE_URL: ${{ env.DATABASE_MIGRATION_URL }}
+        run: pnpm ci:db-prepare
+
+      - name: Typecheck
+        run: pnpm typecheck:all
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Unit tests (API)
+        run: pnpm test:unit
+
+      - name: Integration tests (RLS + cross-tenant)
+        run: pnpm test:integration
+
+      - name: Build API
+        run: pnpm build:api
+
+      - name: Build worker
+        run: pnpm build:worker
+
+      - name: Build web
+        run: pnpm build
