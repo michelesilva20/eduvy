@@ -181,7 +181,12 @@ Answer key still hidden: yes
 ### Commits (Gate 10)
 
 ```text
-(ver hashes após commit — feat database/contracts/api/ui + test + docs)
+2527917 feat(database): add assessment assignments model and RLS
+0cb11de feat(assessments): add assignment DTOs and assign permission
+952b6b7 feat(assessments): implement assignment API and gated attempts
+9ec401e feat(assessments): add assignment admin UI and student take flow
+8a198ce test(assessments): cover assignment availability and smoke flows
+028f528 docs(assessments): document assessment assignment gate 10
 ```
 
 ---
