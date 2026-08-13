@@ -24,6 +24,7 @@ export const TENANT_SCOPED_TABLES = [
   "assessment_questions",
   "assessment_attempts",
   "attempt_answers",
+  "assessment_assignments",
   "learning_paths",
   "files",
   "upload_sessions",
