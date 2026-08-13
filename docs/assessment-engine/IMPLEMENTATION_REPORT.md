@@ -239,8 +239,38 @@ bbae0b1 feat(assessments): add professor results panel with manual grade UI
 
 ---
 
+## Gate 12 — CI Foundation + Release Readiness
+
+**VEREDITO:** PASS
+
+### CI
+
+```text
+Workflow: .github/workflows/ci.yml
+Jobs:     validate (Postgres 16 service)
+Steps:    install → build packages → migrate+RLS → typecheck → lint
+          → unit → integration → build api/worker/web
+Smoke:    .github/workflows/smoke-assessment.yml (workflow_dispatch)
+Script:   scripts/smoke-assessment-engine-api.mjs
+```
+
+### Release
+
+```text
+Checklist: docs/release/ASSESSMENT_ENGINE_1_READINESS.md
+Staging:   não configurado (documentado)
+Prod:      deploy não executado
+```
+
+### Commits (Gate 12)
+
+```text
+(ver hashes após commit)
+```
+
+---
+
 ## Gates pendentes
 
-| Gate | Escopo |
-|------|--------|
-| 12 | CI + Release Readiness |
+Nenhum — Assessment Engine 1.0 gates 8.5–12 concluídos nesta branch.
+Recomendação: abrir PR para `main` após CI verde; **não** mergear automaticamente.
