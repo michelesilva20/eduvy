@@ -1,8 +1,16 @@
 import { platformMetadata } from "@/lib/platform/metadata";
-import { StudentsPageClient } from "@/components/platform/students/students-page-client";
+import { fetchStudents } from "@/lib/people/server";
+import { PeoplePageClient } from "@/components/platform/people/people-page-client";
 
 export const metadata = platformMetadata("Alunos");
 
-export default function StudentsPage() {
-  return <StudentsPageClient />;
+export default async function StudentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ search?: string; status?: string; page?: string }>;
+}) {
+  const params = await searchParams;
+  const { data, error } = await fetchStudents(params);
+
+  return <PeoplePageClient kind="students" initialData={data} error={error} />;
 }
