@@ -34,6 +34,7 @@ const PERMISSIONS = [
   "assessments.update",
   "assessments.publish",
   "assessments.attempt",
+  "assessments.assign",
   "audit.read",
   "entitlements.read",
 ];
@@ -325,6 +326,7 @@ async function main() {
     "assessments.update",
     "assessments.publish",
     "assessments.attempt",
+    "assessments.assign",
   ] as const;
 
   const instructorPermissions = await prisma.permission.findMany({

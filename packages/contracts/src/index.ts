@@ -48,6 +48,7 @@ export const PERMISSIONS = {
   ASSESSMENTS_UPDATE: "assessments.update",
   ASSESSMENTS_PUBLISH: "assessments.publish",
   ASSESSMENTS_ATTEMPT: "assessments.attempt",
+  ASSESSMENTS_ASSIGN: "assessments.assign",
   AUDIT_READ: "audit.read",
   BILLING_READ: "billing.read",
   ENTITLEMENTS_READ: "entitlements.read",
@@ -717,10 +718,42 @@ export interface AssessmentAttemptDto {
   pendingManualGrade: boolean;
 }
 
+export const RESULT_VISIBILITY = {
+  IMMEDIATE: "IMMEDIATE",
+  AFTER_SUBMISSION: "AFTER_SUBMISSION",
+  AFTER_DEADLINE: "AFTER_DEADLINE",
+  MANUAL: "MANUAL",
+} as const;
+
+export type ResultVisibilityCode =
+  (typeof RESULT_VISIBILITY)[keyof typeof RESULT_VISIBILITY];
+
+export interface AssessmentAssignmentDto {
+  id: string;
+  assessmentId: string;
+  assessmentTitle: string;
+  cohortId: string;
+  cohortName: string;
+  lessonId: string | null;
+  availableFrom: string | null;
+  availableUntil: string | null;
+  attemptsAllowed: number | null;
+  timeLimitMinutes: number | null;
+  required: boolean;
+  resultVisibility: ResultVisibilityCode;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AvailableAssessmentDto {
   id: string;
+  assignmentId: string;
   title: string;
   description: string | null;
+  cohortId: string;
+  cohortName: string;
+  lessonId: string | null;
   availableFrom: string | null;
   availableUntil: string | null;
   timeLimitMinutes: number | null;
@@ -728,6 +761,8 @@ export interface AvailableAssessmentDto {
   attemptsUsed: number;
   attemptsRemaining: number | null;
   questionsCount: number;
+  required: boolean;
+  resultVisibility: ResultVisibilityCode;
   currentAttemptId: string | null;
   currentAttemptStatus: AttemptStatusCode | null;
 }
@@ -736,6 +771,7 @@ export interface StudentAttemptResultDto {
   attemptId: string;
   assessmentId: string;
   assessmentTitle: string;
+  assignmentId: string | null;
   status: AttemptStatusCode;
   attemptNumber: number;
   maxAttempts: number | null;
@@ -747,4 +783,6 @@ export interface StudentAttemptResultDto {
   pendingManualGrade: boolean;
   passed: boolean | null;
   passingScore: number | null;
+  resultVisible: boolean;
+  resultVisibility: ResultVisibilityCode | null;
 }
