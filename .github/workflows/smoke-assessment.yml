@@ -1,0 +1,38 @@
+name: Assessment engine smoke
+
+# Full smoke against a running stack (local/staging). Not part of PR validation —
+# keeps CI fast and avoids starting Nest + Redis + MinIO on every PR.
+on:
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: Base API URL (including /api/v1)
+        required: true
+        default: http://localhost:4000/api/v1
+
+jobs:
+  smoke:
+    name: Full assessment smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run smoke
+        env:
+          EDUVY_API_URL: ${{ inputs.api_url }}
+          EDUVY_BFF_SECRET: ${{ secrets.EDUVY_BFF_SECRET }}
+          BFF_SHARED_SECRET: ${{ secrets.BFF_SHARED_SECRET }}
+        run: |
+          if [ -z "$EDUVY_BFF_SECRET" ] && [ -z "$BFF_SHARED_SECRET" ]; then
+            echo "Configure repository secret EDUVY_BFF_SECRET (or BFF_SHARED_SECRET) to run smoke against a remote stack."
+            echo "Locally: pnpm smoke:assessment-engine"
+            exit 1
+          fi
+          node scripts/smoke-assessment-engine-api.mjs
