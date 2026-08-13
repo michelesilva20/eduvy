@@ -63,11 +63,62 @@ f2c494a test(rls): harden learning core tenant isolation
 
 ---
 
+## Gate 9 — Assessment Attempts + Student Player
+
+**VEREDITO:** PASS
+
+### Database
+
+```text
+Migration: 20260813080000_assessment_attempts_engine
+Enum:      AttemptStatus + EXPIRED
+Fields:    attemptNumber, enrollmentId?, expiresAt, gradedAt, score, maxScore
+Indexes:   unique attempt number; partial unique one IN_PROGRESS
+```
+
+### API
+
+```text
+Permission: assessments.attempt (seed STUDENT + INSTRUCTOR + OWNER)
+Endpoints:
+  GET  /learning/assessments
+  POST /assessments/:id/attempts
+  GET  /assessment-attempts/:id
+  PUT  /assessment-attempts/:id/answers/:questionId
+  POST /assessment-attempts/:id/submit
+  GET  /assessment-attempts/:id/result
+```
+
+### Frontend
+
+```text
+/app/my-assessments
+/app/assessments/[id]/take  (fullscreen player)
+```
+
+### Tests
+
+```text
+Unit:  attempt-grading.spec.ts — 6 PASS
+Smoke: scripts/smoke-assessment-attempts-api.mjs — PASS
+```
+
+### Security
+
+```text
+Answer key hidden in player DTO: yes
+Ownership enforced: yes
+Double start → same attempt: yes
+Double submit idempotent: yes
+Timer server-authoritative: yes
+```
+
+---
+
 ## Gates pendentes
 
 | Gate | Escopo |
 |------|--------|
-| 9 | Assessment Attempts + Student Player |
 | 10 | Assessment Assignment |
-| 11 | Auto-grade + Results |
+| 11 | Auto-grade + Results (UI professor + refinamentos) |
 | 12 | CI + Release Readiness |
