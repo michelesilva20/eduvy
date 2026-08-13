@@ -111,12 +111,254 @@ Cross-tenant: PASS
 
 ## Pendências / limitações
 
-- Course Builder com módulos/aulas → Gate 2
 - Jest integration RLS (`*.integration.test.ts`) ainda falha por `@types/pg` ausente; smoke RLS cobre o caso
 - `pnpm db:migrate` via filter precisa de `DATABASE_MIGRATION_URL` (role `eduvy_migration`)
-- Wizard antigo `course-wizard.tsx` permanece no repo, mas não é mais usado
-- Auto-save / drag-and-drop deferred to Gate 2
+- Upload de arquivo binário (FILE/IMAGE) → pipeline de mídia futuro; Gate 2 entrega URL para VIDEO/LINK/DOCUMENT
+- Aceite automático de convites → integração identity/e-mail assíncrono
 
-## Próximo Gate
+## Gate 2 — Course Content (finalizado)
 
-**Gate 2 — CourseModule + Lesson + LessonContent + Course Builder UX**
+### Polish Gate 2
+
+- Removido `course-wizard.tsx` órfão
+- Drag-and-drop nativo no builder (módulos e aulas)
+- Seletor de tipo de aula + URL externa para VIDEO/LINK/DOCUMENT
+
+### Database
+
+```text
+Models: CourseModule (enriched), Lesson (enriched), LessonContent (NEW)
+Migration: 20260813020000_learning_core_content
+Enums: LessonType, LessonStatus, LessonContentType
+RLS: lesson_contents_tenant_isolation (003_lesson_contents.sql)
+Seeds: course_content.read|manage + RolePermission TENANT_OWNER
+```
+
+### API
+
+```text
+Endpoints: GET /courses/:id/structure
+           POST/PATCH/DELETE modules + reorder
+           POST/PATCH/DELETE lessons + reorder
+           PATCH lesson contents
+Permissions: course_content.read|manage
+Duplicate: copia estrutura completa da versão fonte
+```
+
+### Frontend
+
+```text
+Pages: /app/courses/:id/builder — Course Builder
+BFF: /api/courses/:id/structure, /modules, /lessons, /contents
+UX: sidebar de módulos/aulas, editor de texto, autosave, reorder up/down
+Detalhe: link "Editar conteúdo" / "Abrir builder"
+```
+
+### Tests executados (Gate 2)
+
+| Comando | Resultado |
+|---------|-----------|
+| `pnpm --filter @eduvy/api build` | ✅ |
+| `pnpm typecheck` | ✅ |
+| `node scripts/smoke-content-api.mjs` | ✅ módulo → aula → conteúdo → reorder |
+| `pnpm exec tsx packages/database/scripts/verify-rls.ts` | ✅ 25 tables |
+
+## Gate 3 — People
+
+### Database / RBAC
+
+```text
+Sem novos modelos de identidade
+Permissões: students.read|manage, instructors.read|manage
+Roles system: STUDENT, INSTRUCTOR, ACADEMIC_MANAGER por tenant
+Seed demo: aluno@horizonte.demo, professor@horizonte.demo
+```
+
+### API
+
+```text
+GET/POST /students, GET /students/:id, POST /students/invite
+GET/POST /instructors, GET /instructors/:id, POST /instructors/invite
+GET /invitations, POST /invitations/:id/revoke
+```
+
+### Frontend
+
+```text
+/app/students, /app/students/:id
+/app/teachers, /app/teachers/:id
+BFF /api/students/*, /api/instructors/*
+Convite inline + tabela paginada
+```
+
+### Tests
+
+| Comando | Resultado |
+|---------|-----------|
+| `node scripts/smoke-people-api.mjs` | ✅ list + invite |
+
+## Gate 4 — Cohorts
+
+### Database
+
+```text
+Models: Cohort (enriched), CohortInstructor (NEW)
+Migration: 20260813030000_learning_core_cohorts
+Enums: CohortStatus, CohortInstructorRole
+RLS: cohort_instructors_tenant_isolation
+Permissions: cohorts.read|create|update|manage_students
+```
+
+### API
+
+```text
+CRUD /cohorts + open/start/complete/archive
+GET/POST/DELETE /cohorts/:id/instructors
+```
+
+### Frontend
+
+```text
+/app/classes, /app/classes/new, /app/classes/:id
+BFF /api/cohorts/*
+Tabs: visão geral + professores
+```
+
+### Tests
+
+| Comando | Resultado |
+|---------|-----------|
+| `node scripts/smoke-cohorts-api.mjs` | ✅ create/open/assign/list |
+| RLS verify | ✅ 26 tables |
+
+## Gate 5 — Enrollments
+
+### Database
+
+```text
+Model: Enrollment (enriched)
+Migration: 20260813040000_learning_core_enrollments
+Enum: EnrollmentStatus
+Permissions: enrollments.read|create|cancel
+```
+
+### API
+
+```text
+GET/POST /cohorts/:id/enrollments
+POST /cohorts/:id/enrollments/bulk
+POST /enrollments/:id/cancel
+```
+
+### Frontend
+
+```text
+Aba Alunos em /app/classes/:id
+Bulk select + matricular + cancelar
+```
+
+### Tests
+
+| Comando | Resultado |
+|---------|-----------|
+| `node scripts/smoke-enrollments-api.mjs` | ✅ enroll/bulk/cancel |
+
+## Gate 6 — Progress + Student Player
+
+### Database
+
+```text
+Model: LessonProgress (NEW)
+Migration: 20260813050000_learning_core_progress
+Enum: LessonProgressStatus
+RLS: lesson_progress_tenant_isolation (005_lesson_progress.sql)
+Permission: learning_progress.read (+ RolePermission STUDENT / TENANT_OWNER)
+```
+
+### API
+
+```text
+GET  /learning/my-courses
+GET  /learning/:enrollmentId
+POST /learning/:enrollmentId/lessons/:lessonId/start
+POST /learning/:enrollmentId/lessons/:lessonId/complete
+Ownership: enrollment.membership.userId === current user
+Progress: completedLessons / totalLessons
+```
+
+### Frontend
+
+```text
+/app/learning — Meus cursos
+/app/learning/:enrollmentId — Player full-screen
+BFF /api/learning/*
+Nav: Meus cursos
+```
+
+### Tests
+
+| Comando | Resultado |
+|---------|-----------|
+| `pnpm --filter @eduvy/api build` | ✅ |
+| `pnpm typecheck` | ✅ |
+| `node scripts/smoke-learning-api.mjs` | ✅ my-courses/start/complete/idempotent |
+| `pnpm exec tsx packages/database/scripts/verify-rls.ts` | ✅ 27 tables |
+
+## Gate 7 — Instructor Progress
+
+### API / RBAC
+
+```text
+GET /cohorts/:id/progress?filter=&search=&page=&limit=
+Permission: learning_progress.read
+Seed INSTRUCTOR: courses.read, cohorts.read, enrollments.read,
+                 learning_progress.read, students.read, instructors.read
+```
+
+### Frontend
+
+```text
+Aba Progresso em /app/classes/:id
+Tabela + filtros Todos/Não iniciados/Em andamento/Concluídos
+BFF /api/cohorts/:id/progress
+```
+
+### Tests
+
+| Comando | Resultado |
+|---------|-----------|
+| `pnpm --filter @eduvy/api build` | ✅ |
+| `pnpm typecheck` | ✅ |
+| `node scripts/smoke-cohort-progress-api.mjs` | ✅ NOT_STARTED→COMPLETED + professor |
+
+## Gate 8 — Assessment foundation
+
+### Database
+
+```text
+Models: Question, Assessment, AssessmentQuestion, AssessmentAttempt, AttemptAnswer
+Migration: 20260813060000_learning_core_assessments
+RLS: 006_assessments.sql
+Permissions: questions.read|manage, assessments.read|create|update|publish
+```
+
+### API / Frontend
+
+```text
+CRUD /questions + CRUD /assessments + attach/publish/archive
+UI: /app/assessments, /new, /:id
+Attempts: schema only (player deferred)
+```
+
+### Tests
+
+| Comando | Resultado |
+|---------|-----------|
+| `pnpm --filter @eduvy/api build` | ✅ |
+| `pnpm typecheck` | ✅ |
+| `node scripts/smoke-assessments-api.mjs` | ✅ create/attach/publish |
+| `pnpm exec tsx packages/database/scripts/verify-rls.ts` | ✅ 32 tables |
+
+## Learning Core 1.0
+
+Gates 0–8 implementados nesta branch. Próximos incrementos: player de avaliação, tipos avançados, vínculo turma/aula.

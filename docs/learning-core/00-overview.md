@@ -30,4 +30,11 @@ Iniciativa para transformar a fundação SaaS do Eduvy em um LMS funcional, de f
 ## Documentos
 
 - [01-courses.md](./01-courses.md)
+- [02-content.md](./02-content.md)
+- [03-people.md](./03-people.md)
+- [04-cohorts.md](./04-cohorts.md)
+- [05-enrollments.md](./05-enrollments.md)
+- [06-progress.md](./06-progress.md)
+- [07-instructor-progress.md](./07-instructor-progress.md)
+- [08-assessments.md](./08-assessments.md)
 - [IMPLEMENTATION_REPORT.md](./IMPLEMENTATION_REPORT.md)
