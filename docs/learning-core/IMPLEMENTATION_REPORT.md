@@ -5,6 +5,12 @@
 ```text
 Branch: feat/learning-core-1
 Base commit: 58635a17dcd8bf6a78d71863e828c4c6210a9446
+Current commit: d6a7095
+Commits created:
+  - 4e6dee1 docs(learning-core): add project overview and Gate 0/1 documentation
+  - 5779d4d feat(courses): enrich course schema, contracts and RBAC seed
+  - 5405fb6 feat(courses): add tenant-scoped course domain and lifecycle API
+  - d6a7095 feat(courses): integrate real course management UI and BFF
 ```
 
 ## Gate 0 — Baseline
