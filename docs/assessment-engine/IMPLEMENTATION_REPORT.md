@@ -265,7 +265,9 @@ Prod:      deploy não executado
 ### Commits (Gate 12)
 
 ```text
-(ver hashes após commit)
+0a9c10b ci: add GitHub Actions PR validation with Postgres RLS
+13964ab test(assessments): add full engine smoke and fix attempt fixture
+d02e2d2 docs(assessments): document CI readiness and release checklist
 ```
 
 ---
