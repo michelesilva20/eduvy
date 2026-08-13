@@ -45,7 +45,7 @@ class SaveAnswerBodyDto {
 export class AttemptsController {
   constructor(private readonly attempts: AttemptsService) {}
 
-  @Get("learning/assessments")
+  @Get("my-assessments")
   @RequirePermission(PERMISSIONS.ASSESSMENTS_ATTEMPT)
   listMine(
     @CurrentTenantId() tenantId: string,
@@ -59,19 +59,19 @@ export class AttemptsController {
     });
   }
 
-  @Post("assessments/:assessmentId/attempts")
+  @Post("assessment-assignments/:assignmentId/attempts")
   @RequirePermission(PERMISSIONS.ASSESSMENTS_ATTEMPT)
   startOrResume(
     @CurrentTenantId() tenantId: string,
     @CurrentUser() user: { id: string },
-    @Param("assessmentId", ParseUUIDPipe) assessmentId: string,
+    @Param("assignmentId", ParseUUIDPipe) assignmentId: string,
     @Req() req: Request & { requestId?: string },
   ) {
     return this.attempts.startOrResume({
       tenantId,
       userId: user.id,
       requestId: req.requestId ?? "unknown",
-      assessmentId,
+      assignmentId,
     });
   }
 

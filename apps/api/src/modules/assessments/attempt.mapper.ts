@@ -58,6 +58,8 @@ export function mapAttemptPlayer(input: {
   answers: AttemptAnswer[];
   attemptsUsed: number;
   pendingManualGrade: boolean;
+  maxAttempts: number | null;
+  timeLimitMinutes: number | null;
   serverNow?: Date;
 }): AssessmentAttemptDto {
   const questions = [...input.questions]
@@ -91,35 +93,51 @@ export function mapAttemptPlayer(input: {
     answers,
     answeredCount,
     questionsCount: questions.length,
-    timeLimitMinutes: input.assessment.timeLimitMinutes,
-    maxAttempts: input.assessment.maxAttempts,
+    timeLimitMinutes: input.timeLimitMinutes,
+    maxAttempts: input.maxAttempts,
     attemptsUsed: input.attemptsUsed,
     pendingManualGrade: input.pendingManualGrade,
   };
 }
 
 export function mapAvailableAssessment(input: {
-  assessment: Assessment & { _count?: { questions: number } };
+  assessment: Assessment;
+  assignmentId: string;
+  cohortId: string;
+  cohortName: string;
+  lessonId: string | null;
+  availableFrom: Date | null;
+  availableUntil: Date | null;
+  timeLimitMinutes: number | null;
+  maxAttempts: number | null;
   questionsCount: number;
+  required: boolean;
+  resultVisibility: AvailableAssessmentDto["resultVisibility"];
   attemptsUsed: number;
   currentAttempt: AssessmentAttempt | null;
 }): AvailableAssessmentDto {
   const remaining =
-    input.assessment.maxAttempts == null
+    input.maxAttempts == null
       ? null
-      : Math.max(0, input.assessment.maxAttempts - input.attemptsUsed);
+      : Math.max(0, input.maxAttempts - input.attemptsUsed);
 
   return {
     id: input.assessment.id,
+    assignmentId: input.assignmentId,
     title: input.assessment.title,
     description: input.assessment.description,
-    availableFrom: input.assessment.availableFrom?.toISOString() ?? null,
-    availableUntil: input.assessment.availableUntil?.toISOString() ?? null,
-    timeLimitMinutes: input.assessment.timeLimitMinutes,
-    maxAttempts: input.assessment.maxAttempts,
+    cohortId: input.cohortId,
+    cohortName: input.cohortName,
+    lessonId: input.lessonId,
+    availableFrom: input.availableFrom?.toISOString() ?? null,
+    availableUntil: input.availableUntil?.toISOString() ?? null,
+    timeLimitMinutes: input.timeLimitMinutes,
+    maxAttempts: input.maxAttempts,
     attemptsUsed: input.attemptsUsed,
     attemptsRemaining: remaining,
     questionsCount: input.questionsCount,
+    required: input.required,
+    resultVisibility: input.resultVisibility,
     currentAttemptId: input.currentAttempt?.id ?? null,
     currentAttemptStatus:
       (input.currentAttempt?.status as AvailableAssessmentDto["currentAttemptStatus"]) ??
@@ -131,10 +149,15 @@ export function mapStudentResult(input: {
   attempt: AssessmentAttempt;
   assessment: Assessment;
   pendingManualGrade: boolean;
+  resultVisible: boolean;
+  resultVisibility: StudentAttemptResultDto["resultVisibility"];
+  maxAttempts: number | null;
 }): StudentAttemptResultDto {
   const percentage = input.attempt.scorePercentage;
   const passed =
-    percentage == null || input.assessment.passingScore == null
+    !input.resultVisible ||
+    percentage == null ||
+    input.assessment.passingScore == null
       ? null
       : percentage >= input.assessment.passingScore;
 
@@ -142,16 +165,19 @@ export function mapStudentResult(input: {
     attemptId: input.attempt.id,
     assessmentId: input.assessment.id,
     assessmentTitle: input.assessment.title,
+    assignmentId: input.attempt.assignmentId,
     status: input.attempt.status as StudentAttemptResultDto["status"],
     attemptNumber: input.attempt.attemptNumber,
-    maxAttempts: input.assessment.maxAttempts,
-    score: input.attempt.score,
-    maxScore: input.attempt.maxScore,
-    scorePercentage: input.attempt.scorePercentage,
+    maxAttempts: input.maxAttempts,
+    score: input.resultVisible ? input.attempt.score : null,
+    maxScore: input.resultVisible ? input.attempt.maxScore : null,
+    scorePercentage: input.resultVisible ? input.attempt.scorePercentage : null,
     submittedAt: input.attempt.submittedAt?.toISOString() ?? null,
     gradedAt: input.attempt.gradedAt?.toISOString() ?? null,
     pendingManualGrade: input.pendingManualGrade,
     passed,
     passingScore: input.assessment.passingScore,
+    resultVisible: input.resultVisible,
+    resultVisibility: input.resultVisibility,
   };
 }

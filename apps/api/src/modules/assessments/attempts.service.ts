@@ -13,6 +13,7 @@ import type {
 import {
   AssessmentStatus,
   AttemptStatus,
+  EnrollmentStatus,
   MembershipStatus,
   Prisma,
   TenantDatabase,
@@ -20,8 +21,14 @@ import {
 } from "@eduvy/database";
 import { InjectTenantDb } from "../../common/database/database.module";
 import {
+  canAccessAssignment,
+  isResultVisible,
+  resolveAttemptsAllowed,
+  resolveAvailabilityWindow,
+  resolveTimeLimitMinutes,
+} from "./assignment-availability";
+import {
   calculateAttemptTotals,
-  canStartAttempt,
   isAttemptExpired,
   parseAnswerJson,
   type GradableQuestion,
@@ -55,77 +62,165 @@ export class AttemptsService {
         const membership = await this.requireActiveMembership(tx, input);
         const now = new Date();
 
-        const assessments = await tx.assessment.findMany({
-          where: {
-            status: AssessmentStatus.PUBLISHED,
-            OR: [{ availableFrom: null }, { availableFrom: { lte: now } }],
-          },
-          include: { _count: { select: { questions: true } } },
-          orderBy: { publishedAt: "desc" },
-        });
-
-        const attemptGroups = await tx.assessmentAttempt.groupBy({
-          by: ["assessmentId"],
+        const enrollments = await tx.enrollment.findMany({
           where: {
             membershipId: membership.id,
-            status: { not: AttemptStatus.CANCELLED },
+            status: {
+              in: [
+                EnrollmentStatus.ACTIVE,
+                EnrollmentStatus.PENDING,
+                EnrollmentStatus.COMPLETED,
+              ],
+            },
           },
-          _count: { _all: true },
+          select: { id: true, cohortId: true },
         });
-        const usedByAssessment = new Map(
-          attemptGroups.map((row) => [row.assessmentId, row._count._all]),
-        );
+        const cohortIds = enrollments.map((e) => e.cohortId);
+        if (cohortIds.length === 0) return [];
 
-        const inProgress = await tx.assessmentAttempt.findMany({
+        const assignments = await tx.assessmentAssignment.findMany({
           where: {
-            membershipId: membership.id,
-            status: AttemptStatus.IN_PROGRESS,
+            isActive: true,
+            cohortId: { in: cohortIds },
+            assessment: { status: AssessmentStatus.PUBLISHED },
           },
+          include: {
+            assessment: {
+              include: { _count: { select: { questions: true } } },
+            },
+            cohort: { select: { id: true, name: true } },
+          },
+          orderBy: { availableUntil: "asc" },
         });
-        const inProgressByAssessment = new Map(
-          inProgress.map((row) => [row.assessmentId, row]),
-        );
 
-        return assessments
-          .filter((assessment) => {
-            if (assessment.availableUntil && now > assessment.availableUntil) {
-              return Boolean(inProgressByAssessment.get(assessment.id));
-            }
-            return true;
-          })
-          .map((assessment) =>
+        const items: AvailableAssessmentDto[] = [];
+
+        for (const assignment of assignments) {
+          const window = resolveAvailabilityWindow({
+            assignmentFrom: assignment.availableFrom,
+            assignmentUntil: assignment.availableUntil,
+            assessmentFrom: assignment.assessment.availableFrom,
+            assessmentUntil: assignment.assessment.availableUntil,
+          });
+          const maxAttempts = resolveAttemptsAllowed(
+            assignment.attemptsAllowed,
+            assignment.assessment.maxAttempts,
+          );
+          const timeLimitMinutes = resolveTimeLimitMinutes(
+            assignment.timeLimitMinutes,
+            assignment.assessment.timeLimitMinutes,
+          );
+
+          const usedCount = await tx.assessmentAttempt.count({
+            where: {
+              assignmentId: assignment.id,
+              membershipId: membership.id,
+              status: { not: AttemptStatus.CANCELLED },
+            },
+          });
+
+          const currentAttempt = await tx.assessmentAttempt.findFirst({
+            where: {
+              assignmentId: assignment.id,
+              membershipId: membership.id,
+              status: AttemptStatus.IN_PROGRESS,
+            },
+          });
+
+          const gate = canAccessAssignment({
+            assessmentPublished: true,
+            assignmentActive: assignment.isActive,
+            enrolled: true,
+            availableFrom: window.availableFrom,
+            availableUntil: window.availableUntil,
+            maxAttempts,
+            usedCount,
+            hasInProgress: Boolean(currentAttempt),
+            now,
+          });
+
+          if (!gate.ok && !currentAttempt) continue;
+
+          items.push(
             mapAvailableAssessment({
-              assessment,
-              questionsCount: assessment._count.questions,
-              attemptsUsed: usedByAssessment.get(assessment.id) ?? 0,
-              currentAttempt: inProgressByAssessment.get(assessment.id) ?? null,
+              assessment: assignment.assessment,
+              assignmentId: assignment.id,
+              cohortId: assignment.cohort.id,
+              cohortName: assignment.cohort.name,
+              lessonId: assignment.lessonId,
+              availableFrom: window.availableFrom,
+              availableUntil: window.availableUntil,
+              timeLimitMinutes,
+              maxAttempts,
+              questionsCount: assignment.assessment._count.questions,
+              required: assignment.required,
+              resultVisibility:
+                assignment.resultVisibility as AvailableAssessmentDto["resultVisibility"],
+              attemptsUsed: usedCount,
+              currentAttempt,
             }),
           );
+        }
+
+        return items;
       },
     );
   }
 
   startOrResume(
-    input: TenantCtx & { assessmentId: string },
+    input: TenantCtx & { assignmentId: string },
   ): Promise<AssessmentAttemptDto> {
     return this.tenantDb.run(
       { tenantId: input.tenantId, userId: input.userId, requestId: input.requestId },
       async (tx) => {
         const membership = await this.requireActiveMembership(tx, input);
-        const assessment = await tx.assessment.findFirst({
-          where: { id: input.assessmentId },
-          include: assessmentQuestionsInclude,
+        const assignment = await tx.assessmentAssignment.findFirst({
+          where: { id: input.assignmentId },
+          include: {
+            assessment: { include: assessmentQuestionsInclude },
+            cohort: true,
+          },
         });
-        if (!assessment) {
+        if (!assignment) {
           throw new NotFoundException({
-            code: "ASSESSMENT_NOT_FOUND",
-            message: "Avaliação não encontrada.",
+            code: "ASSESSMENT_ASSIGNMENT_NOT_FOUND",
+            message: "Atribuição não encontrada.",
           });
         }
 
+        const assessment = assignment.assessment;
+        const enrollment = await tx.enrollment.findFirst({
+          where: {
+            membershipId: membership.id,
+            cohortId: assignment.cohortId,
+            status: {
+              in: [
+                EnrollmentStatus.ACTIVE,
+                EnrollmentStatus.PENDING,
+                EnrollmentStatus.COMPLETED,
+              ],
+            },
+          },
+        });
+
+        const window = resolveAvailabilityWindow({
+          assignmentFrom: assignment.availableFrom,
+          assignmentUntil: assignment.availableUntil,
+          assessmentFrom: assessment.availableFrom,
+          assessmentUntil: assessment.availableUntil,
+        });
+        const maxAttempts = resolveAttemptsAllowed(
+          assignment.attemptsAllowed,
+          assessment.maxAttempts,
+        );
+        const timeLimitMinutes = resolveTimeLimitMinutes(
+          assignment.timeLimitMinutes,
+          assessment.timeLimitMinutes,
+        );
+
         const existing = await tx.assessmentAttempt.findFirst({
           where: {
-            assessmentId: assessment.id,
+            assignmentId: assignment.id,
             membershipId: membership.id,
             status: AttemptStatus.IN_PROGRESS,
           },
@@ -144,22 +239,29 @@ export class AttemptsService {
               message: "O tempo desta tentativa acabou.",
             });
           }
-          return this.toPlayerDto(tx, refreshed, assessment, membership.id);
+          return this.toPlayerDto(tx, refreshed, assessment, {
+            membershipId: membership.id,
+            assignmentId: assignment.id,
+            maxAttempts,
+            timeLimitMinutes,
+          });
         }
 
         const usedCount = await tx.assessmentAttempt.count({
           where: {
-            assessmentId: assessment.id,
+            assignmentId: assignment.id,
             membershipId: membership.id,
             status: { not: AttemptStatus.CANCELLED },
           },
         });
 
-        const gate = canStartAttempt({
-          published: assessment.status === AssessmentStatus.PUBLISHED,
-          availableFrom: assessment.availableFrom,
-          availableUntil: assessment.availableUntil,
-          maxAttempts: assessment.maxAttempts,
+        const gate = canAccessAssignment({
+          assessmentPublished: assessment.status === AssessmentStatus.PUBLISHED,
+          assignmentActive: assignment.isActive,
+          enrolled: Boolean(enrollment),
+          availableFrom: window.availableFrom,
+          availableUntil: window.availableUntil,
+          maxAttempts,
           usedCount,
           hasInProgress: false,
         });
@@ -176,8 +278,8 @@ export class AttemptsService {
 
         const startedAt = new Date();
         const expiresAt =
-          assessment.timeLimitMinutes != null
-            ? new Date(startedAt.getTime() + assessment.timeLimitMinutes * 60_000)
+          timeLimitMinutes != null
+            ? new Date(startedAt.getTime() + timeLimitMinutes * 60_000)
             : null;
 
         try {
@@ -185,7 +287,9 @@ export class AttemptsService {
             data: {
               tenantId: input.tenantId,
               assessmentId: assessment.id,
+              assignmentId: assignment.id,
               membershipId: membership.id,
+              enrollmentId: enrollment?.id ?? null,
               attemptNumber: usedCount + 1,
               status: AttemptStatus.IN_PROGRESS,
               startedAt,
@@ -203,15 +307,24 @@ export class AttemptsService {
               resourceType: "assessment_attempt",
               resourceId: created.id,
               requestId: input.requestId,
-              metadata: { assessmentId: assessment.id, attemptNumber: created.attemptNumber },
+              metadata: {
+                assessmentId: assessment.id,
+                assignmentId: assignment.id,
+                attemptNumber: created.attemptNumber,
+              },
             },
           });
 
           this.logger.log(
-            `attempt started assessment=${assessment.id} attempt=${created.id}`,
+            `attempt started assignment=${assignment.id} attempt=${created.id}`,
           );
 
-          return this.toPlayerDto(tx, created, assessment, membership.id);
+          return this.toPlayerDto(tx, created, assessment, {
+            membershipId: membership.id,
+            assignmentId: assignment.id,
+            maxAttempts,
+            timeLimitMinutes,
+          });
         } catch (error) {
           if (
             error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -219,14 +332,19 @@ export class AttemptsService {
           ) {
             const raced = await tx.assessmentAttempt.findFirst({
               where: {
-                assessmentId: assessment.id,
+                assignmentId: assignment.id,
                 membershipId: membership.id,
                 status: AttemptStatus.IN_PROGRESS,
               },
               include: { answers: true },
             });
             if (raced) {
-              return this.toPlayerDto(tx, raced, assessment, membership.id);
+              return this.toPlayerDto(tx, raced, assessment, {
+                membershipId: membership.id,
+                assignmentId: assignment.id,
+                maxAttempts,
+                timeLimitMinutes,
+              });
             }
           }
           throw error;
@@ -247,6 +365,7 @@ export class AttemptsService {
           where: { id: attempt.assessmentId },
           include: assessmentQuestionsInclude,
         });
+        const limits = await this.resolveLimits(tx, attempt, assessment);
 
         if (attempt.status === AttemptStatus.IN_PROGRESS) {
           await this.expireIfNeeded(tx, attempt, assessment);
@@ -254,14 +373,22 @@ export class AttemptsService {
             where: { id: attempt.id },
             include: { answers: true },
           });
-          return this.toPlayerDto(tx, refreshed, assessment, membership.id);
+          return this.toPlayerDto(tx, refreshed, assessment, {
+            membershipId: membership.id,
+            assignmentId: attempt.assignmentId,
+            ...limits,
+          });
         }
 
         const withAnswers = await tx.assessmentAttempt.findFirstOrThrow({
           where: { id: attempt.id },
           include: { answers: true },
         });
-        return this.toPlayerDto(tx, withAnswers, assessment, membership.id);
+        return this.toPlayerDto(tx, withAnswers, assessment, {
+          membershipId: membership.id,
+          assignmentId: attempt.assignmentId,
+          ...limits,
+        });
       },
     );
   }
@@ -283,6 +410,7 @@ export class AttemptsService {
           where: { id: attempt.assessmentId },
           include: assessmentQuestionsInclude,
         });
+        const limits = await this.resolveLimits(tx, attempt, assessment);
 
         await this.expireIfNeeded(tx, attempt, assessment);
         const live = await tx.assessmentAttempt.findFirstOrThrow({
@@ -334,7 +462,11 @@ export class AttemptsService {
           where: { id: attempt.id },
           include: { answers: true },
         });
-        return this.toPlayerDto(tx, withAnswers, assessment, membership.id);
+        return this.toPlayerDto(tx, withAnswers, assessment, {
+          membershipId: membership.id,
+          assignmentId: attempt.assignmentId,
+          ...limits,
+        });
       },
     );
   }
@@ -388,6 +520,7 @@ export class AttemptsService {
             requestId: input.requestId,
             metadata: {
               assessmentId: assessment.id,
+              assignmentId: graded.assignmentId,
               status: graded.status,
               scorePercentage: graded.scorePercentage,
             },
@@ -421,6 +554,32 @@ export class AttemptsService {
         return this.toResultDto(tx, attempt, assessment);
       },
     );
+  }
+
+  private async resolveLimits(
+    tx: TransactionClient,
+    attempt: { assignmentId: string | null },
+    assessment: { maxAttempts: number | null; timeLimitMinutes: number | null },
+  ) {
+    if (!attempt.assignmentId) {
+      return {
+        maxAttempts: assessment.maxAttempts,
+        timeLimitMinutes: assessment.timeLimitMinutes,
+      };
+    }
+    const assignment = await tx.assessmentAssignment.findFirst({
+      where: { id: attempt.assignmentId },
+    });
+    return {
+      maxAttempts: resolveAttemptsAllowed(
+        assignment?.attemptsAllowed,
+        assessment.maxAttempts,
+      ),
+      timeLimitMinutes: resolveTimeLimitMinutes(
+        assignment?.timeLimitMinutes,
+        assessment.timeLimitMinutes,
+      ),
+    };
   }
 
   private async gradeAndFinalize(
@@ -529,9 +688,14 @@ export class AttemptsService {
             include: { answers: true },
           });
 
-    await this.gradeAndFinalize(tx, withAnswers as typeof attempt & { answers: Array<{ id: string; questionId: string; answer: unknown }> }, assessment, {
-      forceExpired: true,
-    });
+    await this.gradeAndFinalize(
+      tx,
+      withAnswers as typeof attempt & {
+        answers: Array<{ id: string; questionId: string; answer: unknown }>;
+      },
+      assessment,
+      { forceExpired: true },
+    );
   }
 
   private normalizeAnswerPayload(
@@ -545,7 +709,9 @@ export class AttemptsService {
       };
     }
 
-    const selected = [...new Set((input.selectedOptionIds ?? []).map((id) => id.trim()).filter(Boolean))];
+    const selected = [
+      ...new Set((input.selectedOptionIds ?? []).map((id) => id.trim()).filter(Boolean)),
+    ];
     if (type === "SINGLE_CHOICE" || type === "TRUE_FALSE") {
       return {
         selectedOptionIds: selected.slice(0, 1),
@@ -559,10 +725,7 @@ export class AttemptsService {
     };
   }
 
-  private async requireActiveMembership(
-    tx: TransactionClient,
-    input: TenantCtx,
-  ) {
+  private async requireActiveMembership(tx: TransactionClient, input: TenantCtx) {
     const membership = await tx.membership.findFirst({
       where: {
         userId: input.userId,
@@ -606,6 +769,7 @@ export class AttemptsService {
     attempt: {
       id: string;
       assessmentId: string;
+      assignmentId?: string | null;
       membershipId: string;
       enrollmentId: string | null;
       attemptNumber: number;
@@ -627,8 +791,6 @@ export class AttemptsService {
     assessment: {
       id: string;
       title: string;
-      timeLimitMinutes: number | null;
-      maxAttempts: number | null;
       questions: Array<{
         id: string;
         questionId: string;
@@ -643,12 +805,19 @@ export class AttemptsService {
         };
       }>;
     },
-    membershipId: string,
+    opts: {
+      membershipId: string;
+      assignmentId: string | null;
+      maxAttempts: number | null;
+      timeLimitMinutes: number | null;
+    },
   ): Promise<AssessmentAttemptDto> {
     const attemptsUsed = await tx.assessmentAttempt.count({
       where: {
-        assessmentId: assessment.id,
-        membershipId,
+        ...(opts.assignmentId
+          ? { assignmentId: opts.assignmentId }
+          : { assessmentId: assessment.id }),
+        membershipId: opts.membershipId,
         status: { not: AttemptStatus.CANCELLED },
       },
     });
@@ -664,6 +833,8 @@ export class AttemptsService {
       answers: attempt.answers as never,
       attemptsUsed,
       pendingManualGrade,
+      maxAttempts: opts.maxAttempts,
+      timeLimitMinutes: opts.timeLimitMinutes,
     });
   }
 
@@ -672,6 +843,8 @@ export class AttemptsService {
     attempt: {
       id: string;
       assessmentId: string;
+      assignmentId?: string | null;
+      membershipId?: string;
       attemptNumber: number;
       status: AttemptStatus;
       submittedAt: Date | null;
@@ -685,8 +858,36 @@ export class AttemptsService {
       title: string;
       maxAttempts: number | null;
       passingScore: number | null;
+      availableUntil?: Date | null;
     },
   ): Promise<StudentAttemptResultDto> {
+    const assignment = attempt.assignmentId
+      ? await tx.assessmentAssignment.findFirst({
+          where: { id: attempt.assignmentId },
+        })
+      : null;
+
+    const window = resolveAvailabilityWindow({
+      assignmentFrom: assignment?.availableFrom ?? null,
+      assignmentUntil: assignment?.availableUntil ?? null,
+      assessmentFrom: null,
+      assessmentUntil: assessment.availableUntil ?? null,
+    });
+
+    const visibility =
+      (assignment?.resultVisibility as
+        | "IMMEDIATE"
+        | "AFTER_SUBMISSION"
+        | "AFTER_DEADLINE"
+        | "MANUAL"
+        | null) ?? "AFTER_SUBMISSION";
+
+    const resultVisible = isResultVisible({
+      visibility,
+      status: attempt.status,
+      availableUntil: window.availableUntil,
+    });
+
     const shortTextCount = await tx.assessmentQuestion.count({
       where: {
         assessmentId: assessment.id,
@@ -696,10 +897,18 @@ export class AttemptsService {
     const pendingManualGrade =
       attempt.status === AttemptStatus.SUBMITTED && shortTextCount > 0;
 
+    const maxAttempts = resolveAttemptsAllowed(
+      assignment?.attemptsAllowed,
+      assessment.maxAttempts,
+    );
+
     return mapStudentResult({
       attempt: attempt as never,
       assessment: assessment as never,
       pendingManualGrade,
+      resultVisible,
+      resultVisibility: visibility,
+      maxAttempts,
     });
   }
 }
