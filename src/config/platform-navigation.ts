@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   LibraryBig,
   MessageSquare,
+  MonitorPlay,
   Package,
   PenLine,
   Plug,
@@ -41,6 +42,7 @@ export const platformNavSections: NavSection[] = [
       { id: "overview", label: "Visão geral", href: "/app", icon: LayoutDashboard },
       { id: "courses", label: "Cursos", href: "/app/courses", icon: BookOpen },
       { id: "classes", label: "Turmas", href: "/app/classes", icon: GraduationCap },
+      { id: "learning", label: "Meus cursos", href: "/app/learning", icon: MonitorPlay },
     ],
   },
   {
@@ -85,10 +87,10 @@ export const platformNavSections: NavSection[] = [
 
 export const quickCreateActions = [
   { label: "Novo curso", href: "/app/courses/new" },
-  { label: "Nova turma", href: "/app/classes" },
+  { label: "Nova turma", href: "/app/classes/new" },
   { label: "Novo aluno", href: "/app/students" },
   { label: "Novo professor", href: "/app/teachers" },
-  { label: "Nova avaliação", href: "/app/assessments" },
+  { label: "Nova avaliação", href: "/app/assessments/new" },
   { label: "Novo conteúdo", href: "/app/content" },
 ];
 
