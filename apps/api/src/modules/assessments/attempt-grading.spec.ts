@@ -3,6 +3,7 @@ import {
   canStartAttempt,
   gradeObjectiveAnswer,
   isAttemptExpired,
+  totalsFromAwardedPoints,
 } from "./attempt-grading";
 
 describe("attempt-grading", () => {
@@ -57,6 +58,35 @@ describe("attempt-grading", () => {
         { textAnswer: "hello" },
       ),
     ).toEqual({ isCorrect: null, pointsAwarded: null, pendingManual: true });
+  });
+
+  it("recalculates totals after manual short text grading", () => {
+    const pending = totalsFromAwardedPoints(
+      [
+        { id: "q1", points: 2, type: "SINGLE_CHOICE" },
+        { id: "q2", points: 3, type: "SHORT_TEXT" },
+      ],
+      [
+        { questionId: "q1", isCorrect: true, pointsAwarded: 2 },
+        { questionId: "q2", isCorrect: null, pointsAwarded: null },
+      ],
+    );
+    expect(pending.pendingManualGrade).toBe(true);
+    expect(pending.score).toBe(2);
+
+    const graded = totalsFromAwardedPoints(
+      [
+        { id: "q1", points: 2, type: "SINGLE_CHOICE" },
+        { id: "q2", points: 3, type: "SHORT_TEXT" },
+      ],
+      [
+        { questionId: "q1", isCorrect: true, pointsAwarded: 2 },
+        { questionId: "q2", isCorrect: true, pointsAwarded: 3 },
+      ],
+    );
+    expect(graded.pendingManualGrade).toBe(false);
+    expect(graded.score).toBe(5);
+    expect(graded.scorePercentage).toBe(100);
   });
 
   it("calculates totals and percentage", () => {
