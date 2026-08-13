@@ -10,7 +10,29 @@ const PERMISSIONS = [
   "members.invite",
   "courses.read",
   "courses.create",
+  "courses.update",
   "courses.publish",
+  "courses.delete",
+  "course_content.read",
+  "course_content.manage",
+  "students.read",
+  "students.manage",
+  "instructors.read",
+  "instructors.manage",
+  "cohorts.read",
+  "cohorts.create",
+  "cohorts.update",
+  "cohorts.manage_students",
+  "enrollments.read",
+  "enrollments.create",
+  "enrollments.cancel",
+  "learning_progress.read",
+  "questions.read",
+  "questions.manage",
+  "assessments.read",
+  "assessments.create",
+  "assessments.update",
+  "assessments.publish",
   "audit.read",
   "entitlements.read",
 ];
@@ -89,6 +111,10 @@ async function main() {
     },
   });
 
+  const allPermissions = await prisma.permission.findMany({
+    where: { code: { in: PERMISSIONS } },
+  });
+
   const tenants = [
     { name: "Escola Horizonte", slug: "escola-horizonte" },
     { name: "Academia Corporativa Atlas", slug: "academia-atlas" },
@@ -124,6 +150,23 @@ async function main() {
       },
     });
 
+    for (const permission of allPermissions) {
+      await prisma.rolePermission.upsert({
+        where: {
+          tenantRoleId_permissionId: {
+            tenantRoleId: role.id,
+            permissionId: permission.id,
+          },
+        },
+        update: {},
+        create: {
+          tenantId: tenant.id,
+          tenantRoleId: role.id,
+          permissionId: permission.id,
+        },
+      });
+    }
+
     const existingAssignment = await prisma.membershipRoleAssignment.findFirst({
       where: { tenantId: tenant.id, membershipId: membership.id, tenantRoleId: role.id },
     });
@@ -139,16 +182,18 @@ async function main() {
       });
     }
 
-    await prisma.subscription.create({
-      data: {
-        tenantId: tenant.id,
-        planVersionId: planVersion.id,
-        status: "TRIAL",
-        startsAt: new Date(),
-      },
-    }).catch(async () => {
-      /* subscription may already exist */
-    });
+    await prisma.subscription
+      .create({
+        data: {
+          tenantId: tenant.id,
+          planVersionId: planVersion.id,
+          status: "TRIAL",
+          startsAt: new Date(),
+        },
+      })
+      .catch(async () => {
+        /* subscription may already exist */
+      });
 
     await prisma.tenantEntitlement.upsert({
       where: {
@@ -167,6 +212,160 @@ async function main() {
         limitValue: 50,
       },
     });
+
+    const roleDefs = [
+      { code: "STUDENT", name: "Aluno" },
+      { code: "INSTRUCTOR", name: "Professor" },
+      { code: "ACADEMIC_MANAGER", name: "Gestor acadêmico" },
+    ] as const;
+
+    for (const def of roleDefs) {
+      await prisma.tenantRole.upsert({
+        where: { tenantId_code: { tenantId: tenant.id, code: def.code } },
+        update: {},
+        create: {
+          tenantId: tenant.id,
+          code: def.code,
+          name: def.name,
+          isSystem: true,
+        },
+      });
+    }
+  }
+
+  const horizonte = await prisma.tenant.findUniqueOrThrow({
+    where: { slug: "escola-horizonte" },
+  });
+
+  async function ensureMemberWithRole(input: {
+    email: string;
+    fullName: string;
+    roleCode: string;
+  }) {
+    const user = await prisma.user.upsert({
+      where: { email: input.email },
+      update: { fullName: input.fullName },
+      create: {
+        email: input.email,
+        fullName: input.fullName,
+        emailVerifiedAt: new Date(),
+        authIdentities: { create: { provider: "EMAIL", passwordHash } },
+      },
+    });
+
+    const membership = await prisma.membership.upsert({
+      where: { tenantId_userId: { tenantId: horizonte.id, userId: user.id } },
+      update: { status: "ACTIVE" },
+      create: {
+        tenantId: horizonte.id,
+        userId: user.id,
+        status: "ACTIVE",
+        joinedAt: new Date(),
+      },
+    });
+
+    const role = await prisma.tenantRole.findUniqueOrThrow({
+      where: { tenantId_code: { tenantId: horizonte.id, code: input.roleCode } },
+    });
+
+    const existingAssignment = await prisma.membershipRoleAssignment.findFirst({
+      where: {
+        tenantId: horizonte.id,
+        membershipId: membership.id,
+        tenantRoleId: role.id,
+      },
+    });
+
+    if (!existingAssignment) {
+      await prisma.membershipRoleAssignment.create({
+        data: {
+          tenantId: horizonte.id,
+          membershipId: membership.id,
+          tenantRoleId: role.id,
+          scopeType: "TENANT",
+          assignedBy: owner.id,
+        },
+      });
+    }
+  }
+
+  await ensureMemberWithRole({
+    email: "aluno@horizonte.demo",
+    fullName: "Bruno Aluno",
+    roleCode: "STUDENT",
+  });
+
+  await ensureMemberWithRole({
+    email: "professor@horizonte.demo",
+    fullName: "Carla Professora",
+    roleCode: "INSTRUCTOR",
+  });
+
+  const learningPermission = await prisma.permission.findUniqueOrThrow({
+    where: { code: "learning_progress.read" },
+  });
+
+  const instructorPermissionCodes = [
+    "courses.read",
+    "cohorts.read",
+    "enrollments.read",
+    "learning_progress.read",
+    "students.read",
+    "instructors.read",
+    "questions.read",
+    "questions.manage",
+    "assessments.read",
+    "assessments.create",
+    "assessments.update",
+    "assessments.publish",
+  ] as const;
+
+  const instructorPermissions = await prisma.permission.findMany({
+    where: { code: { in: [...instructorPermissionCodes] } },
+  });
+
+  for (const tenant of await prisma.tenant.findMany()) {
+    const studentRole = await prisma.tenantRole.findUnique({
+      where: { tenantId_code: { tenantId: tenant.id, code: "STUDENT" } },
+    });
+    if (studentRole) {
+      await prisma.rolePermission.upsert({
+        where: {
+          tenantRoleId_permissionId: {
+            tenantRoleId: studentRole.id,
+            permissionId: learningPermission.id,
+          },
+        },
+        update: {},
+        create: {
+          tenantId: tenant.id,
+          tenantRoleId: studentRole.id,
+          permissionId: learningPermission.id,
+        },
+      });
+    }
+
+    const instructorRole = await prisma.tenantRole.findUnique({
+      where: { tenantId_code: { tenantId: tenant.id, code: "INSTRUCTOR" } },
+    });
+    if (!instructorRole) continue;
+
+    for (const permission of instructorPermissions) {
+      await prisma.rolePermission.upsert({
+        where: {
+          tenantRoleId_permissionId: {
+            tenantRoleId: instructorRole.id,
+            permissionId: permission.id,
+          },
+        },
+        update: {},
+        create: {
+          tenantId: tenant.id,
+          tenantRoleId: instructorRole.id,
+          permissionId: permission.id,
+        },
+      });
+    }
   }
 
   console.log("Seed completed.");

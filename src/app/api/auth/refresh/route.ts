@@ -16,7 +16,7 @@ export async function POST() {
     return response;
   }
 
-  const apiResponse = await apiFetch<AuthLoginResponseDto>("/auth/refresh", {
+  const apiResponse = await apiFetch("/auth/refresh", {
     method: "POST",
     body: JSON.stringify({ refreshToken, sessionId }),
   });

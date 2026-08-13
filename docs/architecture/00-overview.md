@@ -1,6 +1,7 @@
 # Eduvy — Visão geral da arquitetura
 
-> **Guia completo:** [Infraestrutura e operação do projeto](./infraestrutura.md)
+> **Documento principal:** [Visão completa do projeto](../projeto-completo.md)  
+> **Guia operacional:** [Infraestrutura e operação](../infraestrutura.md)
 
 ## Estado atual
 

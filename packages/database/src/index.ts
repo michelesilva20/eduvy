@@ -1,4 +1,20 @@
-import { Prisma, PrismaClient } from "@prisma/client";
+import {
+  AssessmentStatus,
+  AttemptStatus,
+  CohortInstructorRole,
+  CohortStatus,
+  CourseStatus,
+  CourseVisibility,
+  CourseVersionStatus,
+  EnrollmentStatus,
+  LessonContentType,
+  LessonProgressStatus,
+  LessonStatus,
+  LessonType,
+  Prisma,
+  PrismaClient,
+  QuestionType,
+} from "@prisma/client";
 
 export type TenantContext = {
   tenantId: string;
@@ -29,4 +45,20 @@ export class TenantDatabase {
   }
 }
 
-export { Prisma, PrismaClient };
+export {
+  AssessmentStatus,
+  AttemptStatus,
+  CohortInstructorRole,
+  CohortStatus,
+  CourseStatus,
+  CourseVisibility,
+  CourseVersionStatus,
+  EnrollmentStatus,
+  LessonContentType,
+  LessonProgressStatus,
+  LessonStatus,
+  LessonType,
+  Prisma,
+  PrismaClient,
+  QuestionType,
+};

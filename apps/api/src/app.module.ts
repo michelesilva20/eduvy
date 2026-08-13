@@ -2,9 +2,18 @@ import { Module } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 import { BffSecretGuard } from "./common/guards/bff-secret.guard";
+import { EntitlementGuard } from "./common/guards/entitlement.guard";
 import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
+import { PermissionGuard } from "./common/guards/permission.guard";
+import { TenantGuard } from "./common/guards/tenant.guard";
 import { AuditModule } from "./modules/audit/audit.module";
 import { AuthorizationModule } from "./modules/authorization/authorization.module";
+import { AssessmentsModule } from "./modules/assessments/assessments.module";
+import { CoursesModule } from "./modules/courses/courses.module";
+import { CohortsModule } from "./modules/cohorts/cohorts.module";
+import { EnrollmentsModule } from "./modules/enrollments/enrollments.module";
+import { LearningModule } from "./modules/learning/learning.module";
+import { PeopleModule } from "./modules/people/people.module";
 import { DatabaseModule } from "./common/database/database.module";
 import { EntitlementsModule } from "./modules/entitlements/entitlements.module";
 import { HealthModule } from "./modules/health/health.module";
@@ -30,10 +39,19 @@ import { LoggingModule } from "./common/logging/logging.module";
     EntitlementsModule,
     AuditModule,
     OutboxModule,
+    CoursesModule,
+    PeopleModule,
+    CohortsModule,
+    EnrollmentsModule,
+    LearningModule,
+    AssessmentsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: TenantGuard },
+    { provide: APP_GUARD, useClass: PermissionGuard },
+    { provide: APP_GUARD, useClass: EntitlementGuard },
     { provide: APP_GUARD, useClass: BffSecretGuard },
   ],
 })

@@ -29,14 +29,18 @@ export async function getSession(): Promise<AuthSessionResponseDto | null> {
   if (!accessToken) return null;
 
   const { apiFetch } = await import("./api-server");
-  const response = await apiFetch<{ id: string; email: string; fullName: string }>("/auth/me", {
+  const response = await apiFetch("/auth/me", {
     accessToken,
     bffOnly: false,
   });
 
   if (!response.ok) return null;
 
-  const user = await response.json();
+  const user = (await response.json()) as {
+    id: string;
+    email: string;
+    fullName: string;
+  };
   return {
     user: {
       id: user.id,

@@ -4,13 +4,13 @@ import { cookies } from "next/headers";
 import { apiFetch } from "@/lib/auth/api-server";
 
 export async function fetchUserTenants(accessToken: string): Promise<TenantSummaryDto[]> {
-  const response = await apiFetch<TenantSummaryDto[]>("/tenants/mine", {
+  const response = await apiFetch("/tenants/mine", {
     accessToken,
     bffOnly: false,
   });
 
   if (!response.ok) return [];
-  return response.json();
+  return (await response.json()) as TenantSummaryDto[];
 }
 
 export async function getTenantContext(accessToken: string): Promise<TenantContextDto> {

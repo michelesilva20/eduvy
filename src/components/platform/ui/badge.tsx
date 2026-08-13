@@ -28,6 +28,7 @@ export function Badge({ className, variant, ...props }: BadgeProps) {
 }
 
 export function StatusBadge({ status }: { status: string }) {
+  const normalized = status.toLowerCase();
   const map: Record<string, BadgeProps["variant"]> = {
     active: "success",
     published: "success",
@@ -39,6 +40,11 @@ export function StatusBadge({ status }: { status: string }) {
     locked: "danger",
     trial: "warning",
     included: "success",
+    in_review: "info",
+    open: "info",
+    in_progress: "success",
+    completed: "success",
+    cancelled: "danger",
   };
   const labels: Record<string, string> = {
     active: "Ativo",
@@ -51,8 +57,15 @@ export function StatusBadge({ status }: { status: string }) {
     locked: "Bloqueado",
     trial: "Em teste",
     included: "Incluído",
+    in_review: "Em revisão",
+    open: "Aberta",
+    in_progress: "Em andamento",
+    completed: "Concluída",
+    cancelled: "Cancelada",
   };
   return (
-    <Badge variant={map[status] ?? "muted"}>{labels[status] ?? status}</Badge>
+    <Badge variant={map[normalized] ?? "muted"}>
+      {labels[normalized] ?? status}
+    </Badge>
   );
 }

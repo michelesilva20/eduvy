@@ -1,17 +1,15 @@
 import { platformMetadata } from "@/lib/platform/metadata";
-import { PlatformFeaturePage } from "@/components/platform/shared/platform-feature-page";
+import { fetchAssessments } from "@/lib/assessments/server";
+import { AssessmentsPageClient } from "@/components/platform/assessments/assessments-page-client";
 
 export const metadata = platformMetadata("Avaliações");
 
-export default function AssessmentsPage() {
-  return (
-    <PlatformFeaturePage
-      title="Avaliações"
-      description="Provas, atividades e notas pendentes."
-      actionLabel="Nova avaliação"
-      actionHref="/app/assessments"
-      emptyTitle="Nenhuma avaliação cadastrada"
-      emptyDescription="Crie provas e atividades para acompanhar o desempenho dos alunos."
-    />
-  );
+export default async function AssessmentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ search?: string; status?: string; page?: string }>;
+}) {
+  const query = await searchParams;
+  const { data, error } = await fetchAssessments(query);
+  return <AssessmentsPageClient initialData={data} error={error} />;
 }

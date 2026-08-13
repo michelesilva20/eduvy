@@ -3,12 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "pnpm exec tsc -p tsconfig.build.json",
+    "build": "node ../../node_modules/typescript/bin/tsc -p tsconfig.build.json",
     "dev": "pnpm exec tsx watch --tsconfig tsconfig.build.json --env-file=../../.env src/main.ts",
     "start": "node dist/main.js",
-    "typecheck": "tsc -p tsconfig.build.json --noEmit",
-    "test": "jest",
-    "test:integration": "jest --config jest.integration.config.ts"
+    "typecheck": "node ../../node_modules/typescript/bin/tsc -p tsconfig.build.json --noEmit",
+    "test": "node ../../node_modules/jest/bin/jest.js --config jest.config.js",
+    "test:integration": "node ../../node_modules/jest/bin/jest.js --config jest.integration.config.ts"
   },
   "dependencies": {
     "@eduvy/config": "workspace:*",

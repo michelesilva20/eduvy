@@ -2,7 +2,7 @@
 
 Documento de referência sobre a arquitetura, infraestrutura local, integração front/back e operação do monorepo Eduvy.
 
-> **Documentos relacionados:** [Visão geral](./architecture/00-overview.md) · [Multi-tenancy](./architecture/02-multi-tenancy.md) · [RLS](./architecture/03-rls.md) · [ADRs](./adr/ADR-001-modular-monolith.md)
+> **Documentos relacionados:** [Visão completa do projeto](./projeto-completo.md) · [Visão geral](./architecture/00-overview.md) · [Multi-tenancy](./architecture/02-multi-tenancy.md) · [RLS](./architecture/03-rls.md) · [ADRs](./adr/ADR-001-modular-monolith.md)
 
 ---
 
