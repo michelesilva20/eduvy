@@ -126,10 +126,69 @@ d80c00f feat(assessments): add student assessment player and my-assessments
 
 ---
 
+## Gate 10 — Assessment Assignment
+
+**VEREDITO:** PASS
+
+### Database
+
+```text
+Migration: 20260813090000_assessment_assignments
+Enum:      ResultVisibility
+Model:     AssessmentAssignment (cohort obrigatório, lesson opcional)
+Fields:    AssessmentAttempt.assignmentId?
+RLS:       008_assessment_assignments.sql
+```
+
+### API
+
+```text
+Permission: assessments.assign (seed INSTRUCTOR + OWNER)
+Endpoints:
+  GET/POST /assessments/:id/assignments
+  PATCH    /assessment-assignments/:id
+  GET      /my-assessments
+  POST     /assessment-assignments/:id/attempts
+Lock:      PUBLISHED + (assignments|attempts) → ASSESSMENT_LOCKED
+```
+
+### Frontend
+
+```text
+Assessment detail → seção Atribuições
+/app/my-assessments → contexto de turma/prazo
+/app/assessments/assignments/:assignmentId/take
+Legacy /app/assessments/:id/take → redirect
+```
+
+### Tests
+
+```text
+Unit:  assignment-availability.spec.ts — PASS
+Smoke: scripts/smoke-assessment-assignments-api.mjs — PASS
+Smoke: scripts/smoke-assessment-attempts-api.mjs — PASS (via assignment)
+```
+
+### Security
+
+```text
+Unassigned assessment hidden from student: yes
+Enrollment required to start: yes
+Result visibility honored: yes
+Answer key still hidden: yes
+```
+
+### Commits (Gate 10)
+
+```text
+(ver hashes após commit — feat database/contracts/api/ui + test + docs)
+```
+
+---
+
 ## Gates pendentes
 
 | Gate | Escopo |
 |------|--------|
-| 10 | Assessment Assignment |
 | 11 | Auto-grade + Results (UI professor + refinamentos) |
 | 12 | CI + Release Readiness |

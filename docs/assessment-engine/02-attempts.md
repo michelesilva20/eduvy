@@ -20,21 +20,18 @@ Constraints:
 - `UNIQUE (tenant, assessment, membership, attempt_number)`
 - Partial unique: **uma** tentativa `IN_PROGRESS` por aluno/avaliação
 
-## Disponibilidade (Gate 9)
+## Disponibilidade
 
-Enquanto o Assignment (Gate 10) não existir, a disponibilidade usa campos do `Assessment`:
+**Gate 10:** disponibilidade e start passam por `AssessmentAssignment` (turma + matrícula + janela da atribuição). Ver [03-assignments.md](./03-assignments.md).
 
-- `status = PUBLISHED`
-- janela `availableFrom` / `availableUntil`
-- `maxAttempts`
-- membership ativa + permissão `assessments.attempt`
+Histórico Gate 9 (antes de assignments): usava campos do `Assessment` (`PUBLISHED`, janela, `maxAttempts`).
 
 ## Endpoints
 
 | Método | Rota | Permissão |
 |--------|------|-----------|
-| GET | `/learning/assessments` | `assessments.attempt` |
-| POST | `/assessments/:id/attempts` | start/resume |
+| GET | `/my-assessments` | `assessments.attempt` |
+| POST | `/assessment-assignments/:id/attempts` | start/resume (Gate 10) |
 | GET | `/assessment-attempts/:id` | player state |
 | PUT | `/assessment-attempts/:id/answers/:questionId` | autosave upsert |
 | POST | `/assessment-attempts/:id/submit` | submit idempotente |
@@ -70,7 +67,7 @@ Admin continua usando `GET /assessments/:id` com gabarito.
 | Rota | Função |
 |------|--------|
 | `/app/my-assessments` | Central do aluno |
-| `/app/assessments/:id/take` | Player fullscreen |
+| `/app/assessments/assignments/:assignmentId/take` | Player fullscreen (Gate 10) |
 
 UX: progress bar, navigator, autosave discreto (Salvando… / Salvo), confirmação de envio com questões em branco.
 
@@ -83,4 +80,4 @@ node --env-file=.env scripts/smoke-assessment-attempts-api.mjs
 
 ## Decisão — imutabilidade
 
-Gate 9 **não** bloqueia edição admin de questões após publish. Risco documentado; Gate 10/11 deve impedir mudanças destrutivas com tentativas ativas (preferência: assessment publicado imutável enquanto houver attempts).
+Resolvido no Gate 10: publicado com assignments ou attempts → `ASSESSMENT_LOCKED` (questões não editáveis).
