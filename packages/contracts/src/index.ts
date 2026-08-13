@@ -49,6 +49,8 @@ export const PERMISSIONS = {
   ASSESSMENTS_PUBLISH: "assessments.publish",
   ASSESSMENTS_ATTEMPT: "assessments.attempt",
   ASSESSMENTS_ASSIGN: "assessments.assign",
+  ASSESSMENTS_RESULTS_READ: "assessments.results.read",
+  ASSESSMENTS_GRADE: "assessments.grade",
   AUDIT_READ: "audit.read",
   BILLING_READ: "billing.read",
   ENTITLEMENTS_READ: "entitlements.read",
@@ -785,4 +787,104 @@ export interface StudentAttemptResultDto {
   passingScore: number | null;
   resultVisible: boolean;
   resultVisibility: ResultVisibilityCode | null;
+}
+
+export const ASSESSMENT_RESULT_ROW_STATUSES = {
+  NOT_STARTED: "NOT_STARTED",
+  IN_PROGRESS: "IN_PROGRESS",
+  SUBMITTED: "SUBMITTED",
+  GRADED: "GRADED",
+  EXPIRED: "EXPIRED",
+} as const;
+
+export type AssessmentResultRowStatusCode =
+  (typeof ASSESSMENT_RESULT_ROW_STATUSES)[keyof typeof ASSESSMENT_RESULT_ROW_STATUSES];
+
+export interface AssessmentResultSummaryDto {
+  studentsCount: number;
+  completedCount: number;
+  pendingCount: number;
+  awaitingGradeCount: number;
+  averagePercentage: number | null;
+  highestPercentage: number | null;
+  lowestPercentage: number | null;
+}
+
+export interface AssessmentResultRowDto {
+  membershipId: string;
+  enrollmentId: string | null;
+  assignmentId: string | null;
+  cohortId: string | null;
+  cohortName: string | null;
+  studentFullName: string;
+  studentEmail: string;
+  status: AssessmentResultRowStatusCode;
+  attemptId: string | null;
+  attemptNumber: number | null;
+  attemptsUsed: number;
+  maxAttempts: number | null;
+  score: number | null;
+  maxScore: number | null;
+  scorePercentage: number | null;
+  submittedAt: string | null;
+  gradedAt: string | null;
+  pendingManualGrade: boolean;
+}
+
+export interface PaginatedAssessmentResultsDto {
+  assessmentId: string;
+  summary: AssessmentResultSummaryDto;
+  items: AssessmentResultRowDto[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    hasMore: boolean;
+  };
+}
+
+export interface AssessmentQuestionStatDto {
+  questionId: string;
+  stem: string;
+  type: QuestionTypeCode;
+  sortOrder: number;
+  answeredCount: number;
+  correctCount: number;
+  pendingManualCount: number;
+  correctPercentage: number | null;
+}
+
+export interface InstructorAttemptAnswerDto {
+  questionId: string;
+  stem: string;
+  type: QuestionTypeCode;
+  points: number;
+  sortOrder: number;
+  selectedOptionIds: string[];
+  textAnswer: string | null;
+  isCorrect: boolean | null;
+  pointsAwarded: number | null;
+  pendingManual: boolean;
+  options: Array<{ id: string; text: string; isCorrect: boolean }> | null;
+}
+
+export interface InstructorAttemptDetailDto {
+  attemptId: string;
+  assessmentId: string;
+  assessmentTitle: string;
+  membershipId: string;
+  studentFullName: string;
+  studentEmail: string;
+  assignmentId: string | null;
+  cohortName: string | null;
+  attemptNumber: number;
+  status: AttemptStatusCode;
+  score: number | null;
+  maxScore: number | null;
+  scorePercentage: number | null;
+  startedAt: string;
+  submittedAt: string | null;
+  gradedAt: string | null;
+  pendingManualGrade: boolean;
+  answers: InstructorAttemptAnswerDto[];
 }
