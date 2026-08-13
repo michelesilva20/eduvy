@@ -24,7 +24,9 @@ export const PERMISSIONS = {
   MEMBERS_INVITE: "members.invite",
   COURSES_READ: "courses.read",
   COURSES_CREATE: "courses.create",
+  COURSES_UPDATE: "courses.update",
   COURSES_PUBLISH: "courses.publish",
+  COURSES_DELETE: "courses.delete",
   AUDIT_READ: "audit.read",
   BILLING_READ: "billing.read",
   ENTITLEMENTS_READ: "entitlements.read",
@@ -75,7 +77,78 @@ export const AUTH_COOKIES = {
 export const AUTH_HEADERS = {
   CSRF: "x-csrf-token",
   BFF_SECRET: "x-eduvy-bff-secret",
+  TENANT_ID: "x-eduvy-tenant-id",
 } as const;
+
+export const COURSE_STATUSES = {
+  DRAFT: "DRAFT",
+  IN_REVIEW: "IN_REVIEW",
+  PUBLISHED: "PUBLISHED",
+  ARCHIVED: "ARCHIVED",
+} as const;
+
+export type CourseStatusCode = (typeof COURSE_STATUSES)[keyof typeof COURSE_STATUSES];
+
+export const COURSE_VISIBILITIES = {
+  PRIVATE: "PRIVATE",
+  TENANT: "TENANT",
+  UNLISTED: "UNLISTED",
+} as const;
+
+export type CourseVisibilityCode =
+  (typeof COURSE_VISIBILITIES)[keyof typeof COURSE_VISIBILITIES];
+
+export interface CourseVersionSummaryDto {
+  id: string;
+  version: number;
+  status: CourseStatusCode;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CourseDto {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  shortDescription: string | null;
+  category: string | null;
+  workloadMinutes: number | null;
+  thumbnailFileId: string | null;
+  visibility: CourseVisibilityCode;
+  status: CourseStatusCode;
+  ownerId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  currentVersion: CourseVersionSummaryDto | null;
+  versionsCount: number;
+}
+
+export interface CourseListItemDto {
+  id: string;
+  slug: string;
+  title: string;
+  shortDescription: string | null;
+  category: string | null;
+  workloadMinutes: number | null;
+  visibility: CourseVisibilityCode;
+  status: CourseStatusCode;
+  ownerId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  currentVersion: CourseVersionSummaryDto | null;
+}
+
+export interface PaginatedCoursesDto {
+  items: CourseListItemDto[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    hasMore: boolean;
+  };
+}
 
 export interface AuthUserDto {
   id: string;

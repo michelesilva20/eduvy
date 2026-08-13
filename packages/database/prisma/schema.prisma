@@ -45,6 +45,19 @@ enum ScopeType {
   OWN_RESOURCE
 }
 
+enum CourseStatus {
+  DRAFT
+  IN_REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+enum CourseVisibility {
+  PRIVATE
+  TENANT
+  UNLISTED
+}
+
 enum CourseVersionStatus {
   DRAFT
   IN_REVIEW
@@ -536,20 +549,29 @@ model UsageCounter {
 // ─── Educational domain (tenant-scoped) ────────────────────────────────────────
 
 model Course {
-  id        String   @id @default(uuid()) @db.Uuid
-  tenantId  String   @map("tenant_id") @db.Uuid
-  slug      String
-  title     String
-  status    String   @default("active")
-  ownerId   String?  @map("owner_id") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id               String           @id @default(uuid()) @db.Uuid
+  tenantId         String           @map("tenant_id") @db.Uuid
+  slug             String
+  title            String
+  description      String?          @db.Text
+  shortDescription String?          @map("short_description") @db.VarChar(500)
+  category         String?
+  workloadMinutes  Int?             @map("workload_minutes")
+  thumbnailFileId  String?          @map("thumbnail_file_id") @db.Uuid
+  visibility       CourseVisibility @default(TENANT)
+  status           CourseStatus     @default(DRAFT)
+  ownerId          String?          @map("owner_id") @db.Uuid
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   versions CourseVersion[]
 
   @@unique([tenantId, id])
   @@unique([tenantId, slug])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@index([tenantId, ownerId])
   @@map("courses")
 }
 

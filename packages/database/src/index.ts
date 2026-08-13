@@ -1,4 +1,10 @@
-import { Prisma, PrismaClient } from "@prisma/client";
+import {
+  CourseStatus,
+  CourseVisibility,
+  CourseVersionStatus,
+  Prisma,
+  PrismaClient,
+} from "@prisma/client";
 
 export type TenantContext = {
   tenantId: string;
@@ -29,4 +35,10 @@ export class TenantDatabase {
   }
 }
 
-export { Prisma, PrismaClient };
+export {
+  CourseStatus,
+  CourseVisibility,
+  CourseVersionStatus,
+  Prisma,
+  PrismaClient,
+};

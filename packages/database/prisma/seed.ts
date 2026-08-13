@@ -10,7 +10,9 @@ const PERMISSIONS = [
   "members.invite",
   "courses.read",
   "courses.create",
+  "courses.update",
   "courses.publish",
+  "courses.delete",
   "audit.read",
   "entitlements.read",
 ];
@@ -89,6 +91,10 @@ async function main() {
     },
   });
 
+  const allPermissions = await prisma.permission.findMany({
+    where: { code: { in: PERMISSIONS } },
+  });
+
   const tenants = [
     { name: "Escola Horizonte", slug: "escola-horizonte" },
     { name: "Academia Corporativa Atlas", slug: "academia-atlas" },
@@ -124,6 +130,23 @@ async function main() {
       },
     });
 
+    for (const permission of allPermissions) {
+      await prisma.rolePermission.upsert({
+        where: {
+          tenantRoleId_permissionId: {
+            tenantRoleId: role.id,
+            permissionId: permission.id,
+          },
+        },
+        update: {},
+        create: {
+          tenantId: tenant.id,
+          tenantRoleId: role.id,
+          permissionId: permission.id,
+        },
+      });
+    }
+
     const existingAssignment = await prisma.membershipRoleAssignment.findFirst({
       where: { tenantId: tenant.id, membershipId: membership.id, tenantRoleId: role.id },
     });
@@ -139,16 +162,18 @@ async function main() {
       });
     }
 
-    await prisma.subscription.create({
-      data: {
-        tenantId: tenant.id,
-        planVersionId: planVersion.id,
-        status: "TRIAL",
-        startsAt: new Date(),
-      },
-    }).catch(async () => {
-      /* subscription may already exist */
-    });
+    await prisma.subscription
+      .create({
+        data: {
+          tenantId: tenant.id,
+          planVersionId: planVersion.id,
+          status: "TRIAL",
+          startsAt: new Date(),
+        },
+      })
+      .catch(async () => {
+        /* subscription may already exist */
+      });
 
     await prisma.tenantEntitlement.upsert({
       where: {
