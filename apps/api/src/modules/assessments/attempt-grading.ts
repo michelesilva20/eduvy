@@ -84,6 +84,47 @@ export function calculateAttemptTotals(
   return { score, maxScore, scorePercentage, pendingManualGrade, perQuestion };
 }
 
+/** Recalculate totals from already-stored answer grades (incl. manual SHORT_TEXT). */
+export function totalsFromAwardedPoints(
+  questions: Array<{ id: string; points: number; type: string }>,
+  answers: Array<{
+    questionId: string;
+    isCorrect: boolean | null;
+    pointsAwarded: number | null;
+  }>,
+): {
+  score: number;
+  maxScore: number;
+  scorePercentage: number;
+  pendingManualGrade: boolean;
+} {
+  let score = 0;
+  let maxScore = 0;
+  let pendingManualGrade = false;
+  const byQuestion = new Map(answers.map((a) => [a.questionId, a]));
+
+  for (const question of questions) {
+    maxScore += question.points;
+    const answer = byQuestion.get(question.id);
+    if (question.type === "SHORT_TEXT") {
+      if (answer == null || answer.pointsAwarded == null) {
+        pendingManualGrade = true;
+      } else {
+        score += answer.pointsAwarded;
+      }
+      continue;
+    }
+    if (typeof answer?.pointsAwarded === "number") {
+      score += answer.pointsAwarded;
+    }
+  }
+
+  const scorePercentage =
+    maxScore === 0 ? 0 : Math.round((score / maxScore) * 100);
+
+  return { score, maxScore, scorePercentage, pendingManualGrade };
+}
+
 export function parseAnswerJson(value: unknown): StudentAnswerPayload {
   if (!value || typeof value !== "object") {
     return { selectedOptionIds: [], textAnswer: null };

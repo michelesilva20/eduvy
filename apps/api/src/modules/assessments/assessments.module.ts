@@ -7,6 +7,8 @@ import { AttemptsController } from "./attempts.controller";
 import { AttemptsService } from "./attempts.service";
 import { QuestionsController } from "./questions.controller";
 import { QuestionsService } from "./questions.service";
+import { ResultsController } from "./results.controller";
+import { ResultsService } from "./results.service";
 
 @Module({
   controllers: [
@@ -14,18 +16,21 @@ import { QuestionsService } from "./questions.service";
     QuestionsController,
     AttemptsController,
     AssignmentsController,
+    ResultsController,
   ],
   providers: [
     AssessmentsService,
     QuestionsService,
     AttemptsService,
     AssignmentsService,
+    ResultsService,
   ],
   exports: [
     AssessmentsService,
     QuestionsService,
     AttemptsService,
     AssignmentsService,
+    ResultsService,
   ],
 })
 export class AssessmentsModule {}
