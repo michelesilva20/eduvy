@@ -133,6 +133,7 @@ enum AttemptStatus {
   IN_PROGRESS
   SUBMITTED
   GRADED
+  EXPIRED
   CANCELLED
 }
 
@@ -804,6 +805,7 @@ model Enrollment {
   courseVersion CourseVersion    @relation(fields: [tenantId, courseVersionId], references: [tenantId, id], onDelete: Restrict)
   membership    Membership       @relation(fields: [tenantId, membershipId], references: [tenantId, id], onDelete: Restrict)
   lessonProgress LessonProgress[]
+  assessmentAttempts AssessmentAttempt[]
 
   @@unique([tenantId, id])
   @@unique([tenantId, cohortId, membershipId, courseVersionId])
@@ -921,18 +923,26 @@ model AssessmentAttempt {
   tenantId         String        @map("tenant_id") @db.Uuid
   assessmentId     String        @map("assessment_id") @db.Uuid
   membershipId     String        @map("membership_id") @db.Uuid
+  enrollmentId     String?       @map("enrollment_id") @db.Uuid
+  attemptNumber    Int           @map("attempt_number")
   status           AttemptStatus @default(IN_PROGRESS)
   startedAt        DateTime      @default(now()) @map("started_at") @db.Timestamptz(6)
+  expiresAt        DateTime?     @map("expires_at") @db.Timestamptz(6)
   submittedAt      DateTime?     @map("submitted_at") @db.Timestamptz(6)
+  gradedAt         DateTime?     @map("graded_at") @db.Timestamptz(6)
+  score            Int?
+  maxScore         Int?          @map("max_score")
   scorePercentage  Int?          @map("score_percentage")
   createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   assessment Assessment     @relation(fields: [tenantId, assessmentId], references: [tenantId, id], onDelete: Restrict)
   membership Membership     @relation(fields: [tenantId, membershipId], references: [tenantId, id], onDelete: Restrict)
+  enrollment Enrollment?    @relation(fields: [tenantId, enrollmentId], references: [tenantId, id], onDelete: Restrict)
   answers    AttemptAnswer[]
 
   @@unique([tenantId, id])
+  @@unique([tenantId, assessmentId, membershipId, attemptNumber])
   @@index([tenantId, assessmentId, membershipId])
   @@index([tenantId, membershipId, status])
   @@map("assessment_attempts")
