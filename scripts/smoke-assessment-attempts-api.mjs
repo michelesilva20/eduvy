@@ -1,5 +1,6 @@
 /**
- * Smoke Gate 9 — Assessment attempts (admin publish → student attempt → submit).
+ * Smoke Gate 9/10 — Assessment attempts via assignment
+ * (admin publish → assign cohort → student attempt → submit).
  */
 const API = process.env.EDUVY_API_URL ?? "http://localhost:4000/api/v1";
 const BFF = process.env.EDUVY_BFF_SECRET ?? process.env.BFF_SHARED_SECRET;
@@ -35,6 +36,50 @@ async function login(email) {
 async function main() {
   const admin = await login("owner@horizonte.demo");
   const stamp = Date.now();
+
+  const courseRes = await fetch(`${API}/courses`, {
+    method: "POST",
+    headers: admin.headers,
+    body: JSON.stringify({ title: `Attempt Smoke Course ${stamp}` }),
+  });
+  if (!courseRes.ok) throw new Error(`course: ${await courseRes.text()}`);
+  const course = await courseRes.json();
+
+  const publishCourse = await fetch(`${API}/courses/${course.id}/publish`, {
+    method: "POST",
+    headers: admin.headers,
+  });
+  if (!publishCourse.ok) throw new Error(`publish course: ${await publishCourse.text()}`);
+
+  const cohortRes = await fetch(`${API}/cohorts`, {
+    method: "POST",
+    headers: admin.headers,
+    body: JSON.stringify({ name: `Turma Attempt ${stamp}`, courseId: course.id }),
+  });
+  if (!cohortRes.ok) throw new Error(`cohort: ${await cohortRes.text()}`);
+  const cohort = await cohortRes.json();
+
+  await fetch(`${API}/cohorts/${cohort.id}/open`, {
+    method: "POST",
+    headers: admin.headers,
+  });
+
+  const studentsRes = await fetch(`${API}/students?status=ACTIVE`, {
+    headers: admin.headers,
+  });
+  if (!studentsRes.ok) throw new Error(`students: ${await studentsRes.text()}`);
+  const students = await studentsRes.json();
+  const membershipId = students.items?.find(
+    (s) => s.email === "aluno@horizonte.demo",
+  )?.membershipId;
+  if (!membershipId) throw new Error("demo student not found");
+
+  const enrollRes = await fetch(`${API}/cohorts/${cohort.id}/enrollments`, {
+    method: "POST",
+    headers: admin.headers,
+    body: JSON.stringify({ membershipId }),
+  });
+  if (!enrollRes.ok) throw new Error(`enroll: ${await enrollRes.text()}`);
 
   const assessmentRes = await fetch(`${API}/assessments`, {
     method: "POST",
@@ -95,20 +140,33 @@ async function main() {
   });
   if (!publish.ok) throw new Error(`publish: ${await publish.text()}`);
 
+  const assignRes = await fetch(`${API}/assessments/${assessment.id}/assignments`, {
+    method: "POST",
+    headers: admin.headers,
+    body: JSON.stringify({
+      cohortId: cohort.id,
+      attemptsAllowed: 2,
+      timeLimitMinutes: 30,
+      resultVisibility: "AFTER_SUBMISSION",
+    }),
+  });
+  if (!assignRes.ok) throw new Error(`assign: ${await assignRes.text()}`);
+  const assignment = await assignRes.json();
+
   const student = await login("aluno@horizonte.demo");
 
-  const startA = await fetch(`${API}/assessments/${assessment.id}/attempts`, {
-    method: "POST",
-    headers: student.headers,
-  });
+  const startA = await fetch(
+    `${API}/assessment-assignments/${assignment.id}/attempts`,
+    { method: "POST", headers: student.headers },
+  );
   if (!startA.ok) throw new Error(`start: ${await startA.text()}`);
   const attemptA = await startA.json();
 
   // Double-click / concurrent start must resume same attempt
-  const startB = await fetch(`${API}/assessments/${assessment.id}/attempts`, {
-    method: "POST",
-    headers: student.headers,
-  });
+  const startB = await fetch(
+    `${API}/assessment-assignments/${assignment.id}/attempts`,
+    { method: "POST", headers: student.headers },
+  );
   if (!startB.ok) throw new Error(`start resume: ${await startB.text()}`);
   const attemptB = await startB.json();
   if (attemptA.id !== attemptB.id) throw new Error("duplicate in-progress attempt created");
@@ -177,7 +235,7 @@ async function main() {
     throw new Error("double submit changed score");
   }
 
-  // Cross-tenant / ownership: admin cannot use student attempt without assessments.attempt? 
+  // Cross-tenant / ownership: admin cannot use student attempt without assessments.attempt?
   // Admin as TENANT_OWNER has assessments.attempt but different membership — should be forbidden.
   const steal = await fetch(`${API}/assessment-attempts/${attemptA.id}`, {
     headers: admin.headers,
@@ -196,6 +254,7 @@ async function main() {
   console.log("PASS smoke-assessment-attempts-api");
   console.log({
     assessmentId: assessment.id,
+    assignmentId: assignment.id,
     attemptId: attemptA.id,
     scorePercentage: result1.scorePercentage,
   });
