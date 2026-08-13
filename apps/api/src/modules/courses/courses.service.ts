@@ -14,6 +14,7 @@ import type {
 import { CourseStatus, CourseVisibility, TenantDatabase, type Prisma } from "@eduvy/database";
 import { InjectTenantDb } from "../../common/database/database.module";
 import { mapCourse, mapCourseListItem } from "./course.mapper";
+import { CourseContentService } from "./course-content.service";
 import { ensureUniqueCourseSlug, slugifyCourseTitle } from "./course.slug";
 
 export interface CreateCourseInput {
@@ -66,7 +67,10 @@ const versionInclude = {
 
 @Injectable()
 export class CoursesService {
-  constructor(@InjectTenantDb() private readonly tenantDb: TenantDatabase) {}
+  constructor(
+    @InjectTenantDb() private readonly tenantDb: TenantDatabase,
+    private readonly courseContent: CourseContentService,
+  ) {}
 
   async list(input: ListCoursesInput): Promise<PaginatedCoursesDto> {
     const page = Math.max(1, input.page ?? 1);
@@ -440,7 +444,12 @@ export class CoursesService {
           },
         });
 
-        await tx.courseVersion.create({
+        const sourceVersion = await tx.courseVersion.findFirst({
+          where: { courseId: source.id },
+          orderBy: { version: "desc" },
+        });
+
+        const newVersion = await tx.courseVersion.create({
           data: {
             tenantId: input.tenantId,
             courseId: created.id,
@@ -448,6 +457,15 @@ export class CoursesService {
             status: "DRAFT",
           },
         });
+
+        if (sourceVersion) {
+          await this.courseContent.copyStructureFromVersion(
+            tx,
+            input.tenantId,
+            sourceVersion.id,
+            newVersion.id,
+          );
+        }
 
         const course = await tx.course.findFirstOrThrow({
           where: { id: created.id },

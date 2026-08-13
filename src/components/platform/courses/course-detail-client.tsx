@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { CourseDto } from "@eduvy/contracts";
-import { ArrowLeft, Archive, Copy, Pencil, Rocket } from "lucide-react";
+import { ArrowLeft, Archive, Copy, Layers, Pencil, Rocket } from "lucide-react";
 import { PageHeader } from "@/components/platform/shared/page-header";
 import { StatusBadge } from "@/components/platform/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -73,6 +73,13 @@ export function CourseDetailClient({ course }: { course: CourseDto }) {
       </div>
 
       <div className="mb-6 flex flex-wrap gap-2">
+        <Button variant="secondary" asChild disabled={pending}>
+          <Link href={`/app/courses/${course.id}/builder`}>
+            <Layers className="size-4" aria-hidden />
+            Editar conteúdo
+          </Link>
+        </Button>
+
         <Button variant="secondary" asChild disabled={pending}>
           <Link href={`/app/courses/${course.id}/edit`}>
             <Pencil className="size-4" aria-hidden />
@@ -206,15 +213,21 @@ export function CourseDetailClient({ course }: { course: CourseDto }) {
         </article>
       </section>
 
-      <section className="mt-6 rounded-[var(--radius-card)] border border-dashed border-border-light bg-background-soft/40 p-5">
+      <section className="mt-6 rounded-[var(--radius-card)] border border-border-light bg-surface-light p-5">
         <h2 className="font-[family-name:var(--font-sora)] text-base font-bold text-text-primary">
           Conteúdo do curso
         </h2>
         <p className="mt-2 max-w-2xl text-sm text-text-muted">
-          Módulos, aulas e conteúdos entram no Gate 2. Esta versão já cria a versão{" "}
-          {course.currentVersion ? `v${course.currentVersion.version}` : "inicial"} do curso
-          para estruturar o conteúdo em seguida.
+          Estruture módulos, aulas e textos no builder. A versão{" "}
+          {course.currentVersion ? `v${course.currentVersion.version}` : "inicial"} está pronta
+          para receber o conteúdo.
         </p>
+        <Button variant="secondary" className="mt-4" asChild>
+          <Link href={`/app/courses/${course.id}/builder`}>
+            <Layers className="size-4" aria-hidden />
+            Abrir builder
+          </Link>
+        </Button>
       </section>
     </>
   );
