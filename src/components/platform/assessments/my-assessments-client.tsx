@@ -29,7 +29,7 @@ export function MyAssessmentsClient({
           Nenhuma avaliação disponível
         </h2>
         <p className="mt-2 text-sm text-text-muted">
-          Quando uma avaliação for publicada para você, ela aparecerá aqui.
+          Quando uma avaliação for atribuída à sua turma, ela aparecerá aqui.
         </p>
       </div>
     );
@@ -49,9 +49,9 @@ export function MyAssessmentsClient({
 
   return (
     <div className="space-y-10">
-      <Section title="Em andamento" items={inProgress} accent="progress" />
-      <Section title="Pendentes" items={pending} accent="pending" />
-      <Section title="Concluídas / sem tentativas" items={completed} accent="done" />
+      <Section title="Em andamento" items={inProgress} />
+      <Section title="Pendentes" items={pending} />
+      <Section title="Concluídas / sem tentativas" items={completed} done />
     </div>
   );
 }
@@ -59,11 +59,11 @@ export function MyAssessmentsClient({
 function Section({
   title,
   items,
-  accent,
+  done,
 }: {
   title: string;
   items: AvailableAssessmentDto[];
-  accent: "progress" | "pending" | "done";
+  done?: boolean;
 }) {
   if (items.length === 0) return null;
 
@@ -85,13 +85,14 @@ function Section({
 
           return (
             <li
-              key={item.id}
+              key={item.assignmentId}
               className="flex flex-col gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-5 sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="min-w-0">
                 <p className="font-[family-name:var(--font-sora)] text-base font-semibold text-text-primary">
                   {item.title}
                 </p>
+                <p className="mt-1 text-sm text-text-secondary">Turma: {item.cohortName}</p>
                 {item.description && (
                   <p className="mt-1 line-clamp-2 text-sm text-text-muted">
                     {item.description}
@@ -113,10 +114,11 @@ function Section({
                   {item.timeLimitMinutes != null && (
                     <span>{item.timeLimitMinutes} min</span>
                   )}
+                  {item.required && <span>Obrigatória</span>}
                 </div>
               </div>
-              <Button asChild disabled={disabled} variant={accent === "done" ? "outline" : "default"}>
-                <Link href={`/app/assessments/${item.id}/take`}>
+              <Button asChild disabled={disabled} variant={done ? "outline" : "default"}>
+                <Link href={`/app/assessments/assignments/${item.assignmentId}/take`}>
                   <PlayCircle className="size-4" aria-hidden />
                   {cta}
                 </Link>

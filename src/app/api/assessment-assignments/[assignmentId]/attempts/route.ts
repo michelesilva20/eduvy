@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { apiFetchWithSession, readApiError } from "@/lib/auth/api-server";
 
-type Params = { params: Promise<{ id: string }> };
+type Params = { params: Promise<{ assignmentId: string }> };
 
 export async function POST(_request: Request, { params }: Params) {
-  const { id } = await params;
-  const response = await apiFetchWithSession(`/assessments/${id}/attempts`, {
-    method: "POST",
-  });
+  const { assignmentId } = await params;
+  const response = await apiFetchWithSession(
+    `/assessment-assignments/${assignmentId}/attempts`,
+    { method: "POST" },
+  );
   if (!response.ok) {
     return NextResponse.json(
       { message: await readApiError(response) },

@@ -241,7 +241,12 @@ export function AssessmentPlayerClient({
           <h1 className="mt-2 font-[family-name:var(--font-sora)] text-2xl font-bold text-text-primary">
             {result.assessmentTitle}
           </h1>
-          {result.pendingManualGrade ? (
+          {!result.resultVisible ? (
+            <p className="mt-6 text-base text-text-secondary">
+              Sua avaliação foi enviada. O resultado será liberado conforme a política da
+              turma.
+            </p>
+          ) : result.pendingManualGrade ? (
             <p className="mt-6 text-base text-text-secondary">
               Correção em andamento — há questões de resposta aberta.
             </p>

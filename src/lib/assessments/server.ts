@@ -1,4 +1,5 @@
 import type {
+  AssessmentAssignmentDto,
   AssessmentAttemptDto,
   AssessmentDto,
   AvailableAssessmentDto,
@@ -79,7 +80,7 @@ export async function fetchMyAssessments(): Promise<{
   error: string | null;
 }> {
   try {
-    const response = await apiFetchWithSession("/learning/assessments");
+    const response = await apiFetchWithSession("/my-assessments");
     if (!response.ok) return { data: null, error: await readApiError(response) };
     return { data: (await response.json()) as AvailableAssessmentDto[], error: null };
   } catch {
@@ -90,16 +91,35 @@ export async function fetchMyAssessments(): Promise<{
   }
 }
 
-export async function startAssessmentAttempt(assessmentId: string): Promise<{
+export async function startAssessmentAttempt(assignmentId: string): Promise<{
   data: AssessmentAttemptDto | null;
   error: string | null;
 }> {
   try {
-    const response = await apiFetchWithSession(`/assessments/${assessmentId}/attempts`, {
-      method: "POST",
-    });
+    const response = await apiFetchWithSession(
+      `/assessment-assignments/${assignmentId}/attempts`,
+      { method: "POST" },
+    );
     if (!response.ok) return { data: null, error: await readApiError(response) };
     return { data: (await response.json()) as AssessmentAttemptDto, error: null };
+  } catch {
+    return {
+      data: null,
+      error: "A API não está respondendo. Verifique se a API está em execução.",
+    };
+  }
+}
+
+export async function fetchAssessmentAssignments(assessmentId: string): Promise<{
+  data: AssessmentAssignmentDto[] | null;
+  error: string | null;
+}> {
+  try {
+    const response = await apiFetchWithSession(
+      `/assessments/${assessmentId}/assignments`,
+    );
+    if (!response.ok) return { data: null, error: await readApiError(response) };
+    return { data: (await response.json()) as AssessmentAssignmentDto[], error: null };
   } catch {
     return {
       data: null,
