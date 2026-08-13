@@ -191,9 +191,52 @@ Answer key still hidden: yes
 
 ---
 
+## Gate 11 — Auto-grade + Results
+
+**VEREDITO:** PASS
+
+### API
+
+```text
+Permissions: assessments.results.read, assessments.grade
+Endpoints:
+  GET   /assessments/:id/results
+  GET   /assessments/:id/results/questions
+  GET   /assessment-attempts/:id/instructor
+  PATCH /assessment-attempts/:id/answers/:questionId/grade
+```
+
+### Frontend
+
+```text
+Assessment detail → seção Resultados (resumo, tabela, drawer, grade SHORT_TEXT)
+Student player → "Correção em andamento" quando pendingManualGrade
+```
+
+### Tests
+
+```text
+Unit:  attempt-grading.spec.ts — 7 PASS (incl. totalsFromAwardedPoints)
+Smoke: scripts/smoke-assessment-results-api.mjs — PASS
+```
+
+### Security
+
+```text
+Student forbidden on /results: yes
+Manual grade recalculates + audit assessment.graded: yes
+```
+
+### Commits (Gate 11)
+
+```text
+(ver hashes após commit)
+```
+
+---
+
 ## Gates pendentes
 
 | Gate | Escopo |
 |------|--------|
-| 11 | Auto-grade + Results (UI professor + refinamentos) |
 | 12 | CI + Release Readiness |

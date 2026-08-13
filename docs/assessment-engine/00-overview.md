@@ -9,7 +9,7 @@ Iniciativa pós–Learning Core para endurecer o domínio educacional e fechar o
 | **8.5** | Learning Core Hardening | Concluído |
 | **9** | Assessment Attempts + Student Player | Concluído |
 | **10** | Assessment Assignment | Concluído |
-| **11** | Auto-grade + Results | Pendente |
+| **11** | Auto-grade + Results | Concluído |
 | **12** | CI Foundation + Release Readiness | Pendente |
 
 ## Branch
@@ -21,4 +21,5 @@ Iniciativa pós–Learning Core para endurecer o domínio educacional e fechar o
 - [01-hardening.md](./01-hardening.md) — Gate 8.5
 - [02-attempts.md](./02-attempts.md) — Gate 9
 - [03-assignments.md](./03-assignments.md) — Gate 10
+- [04-results.md](./04-results.md) — Gate 11
 - [IMPLEMENTATION_REPORT.md](./IMPLEMENTATION_REPORT.md) — relatório cumulativo
