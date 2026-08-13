@@ -173,8 +173,9 @@ describeIf("Learning Core cross-tenant integrity", () => {
     const attemptId = randomUUID();
     await withTenant(client, tenantA.tenantId, async () => {
       await client.query(
-        `INSERT INTO assessment_attempts (id, tenant_id, assessment_id, membership_id, status, updated_at)
-         VALUES ($1, $2, $3, $4, 'IN_PROGRESS', NOW())`,
+        `INSERT INTO assessment_attempts
+           (id, tenant_id, assessment_id, membership_id, attempt_number, status, updated_at)
+         VALUES ($1, $2, $3, $4, 1, 'IN_PROGRESS', NOW())`,
         [attemptId, tenantA.tenantId, tenantA.assessmentId, tenantA.membershipId],
       );
     });
