@@ -230,7 +230,11 @@ Manual grade recalculates + audit assessment.graded: yes
 ### Commits (Gate 11)
 
 ```text
-(ver hashes após commit)
+4b67b18 feat(assessments): add results and grade permissions with DTOs
+7910c9c feat(assessments): implement professor results and manual grading API
+bbae0b1 feat(assessments): add professor results panel with manual grade UI
+67bb15e test(assessments): cover manual grade totals and results smoke
+5ee6de3 docs(assessments): document auto-grade and results gate 11
 ```
 
 ---
