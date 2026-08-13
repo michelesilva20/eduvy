@@ -113,6 +113,17 @@ Double submit idempotent: yes
 Timer server-authoritative: yes
 ```
 
+### Commits (Gate 9)
+
+```text
+f0bfcce feat(database): extend assessment attempts for student engine
+55748d4 feat(assessments): add attempt permission and student DTOs
+73ea084 feat(assessments): implement student assessment attempts API
+d80c00f feat(assessments): add student assessment player and my-assessments
+7c4b57d test(assessments): cover attempt grading and smoke student flow
+7531e0e docs(assessments): document assessment attempts gate 9
+```
+
 ---
 
 ## Gates pendentes
