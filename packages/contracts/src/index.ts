@@ -47,6 +47,7 @@ export const PERMISSIONS = {
   ASSESSMENTS_CREATE: "assessments.create",
   ASSESSMENTS_UPDATE: "assessments.update",
   ASSESSMENTS_PUBLISH: "assessments.publish",
+  ASSESSMENTS_ATTEMPT: "assessments.attempt",
   AUDIT_READ: "audit.read",
   BILLING_READ: "billing.read",
   ENTITLEMENTS_READ: "entitlements.read",
@@ -653,4 +654,97 @@ export interface PaginatedAssessmentsDto {
     total: number;
     hasMore: boolean;
   };
+}
+
+export const ATTEMPT_STATUSES = {
+  IN_PROGRESS: "IN_PROGRESS",
+  SUBMITTED: "SUBMITTED",
+  GRADED: "GRADED",
+  EXPIRED: "EXPIRED",
+  CANCELLED: "CANCELLED",
+} as const;
+
+export type AttemptStatusCode =
+  (typeof ATTEMPT_STATUSES)[keyof typeof ATTEMPT_STATUSES];
+
+/** Public option — never includes isCorrect. */
+export interface StudentQuestionOptionDto {
+  id: string;
+  text: string;
+}
+
+/** Player-safe question — no answer key / explanation / correctAnswer. */
+export interface StudentQuestionDto {
+  id: string;
+  stem: string;
+  type: QuestionTypeCode;
+  options: StudentQuestionOptionDto[] | null;
+  points: number;
+  sortOrder: number;
+  pointsOverride: number | null;
+}
+
+export interface AttemptAnswerDto {
+  questionId: string;
+  selectedOptionIds: string[];
+  textAnswer: string | null;
+  answeredAt: string | null;
+}
+
+export interface AssessmentAttemptDto {
+  id: string;
+  assessmentId: string;
+  assessmentTitle: string;
+  membershipId: string;
+  enrollmentId: string | null;
+  attemptNumber: number;
+  status: AttemptStatusCode;
+  startedAt: string;
+  expiresAt: string | null;
+  submittedAt: string | null;
+  gradedAt: string | null;
+  score: number | null;
+  maxScore: number | null;
+  scorePercentage: number | null;
+  serverNow: string;
+  questions: StudentQuestionDto[];
+  answers: AttemptAnswerDto[];
+  answeredCount: number;
+  questionsCount: number;
+  timeLimitMinutes: number | null;
+  maxAttempts: number | null;
+  attemptsUsed: number;
+  pendingManualGrade: boolean;
+}
+
+export interface AvailableAssessmentDto {
+  id: string;
+  title: string;
+  description: string | null;
+  availableFrom: string | null;
+  availableUntil: string | null;
+  timeLimitMinutes: number | null;
+  maxAttempts: number | null;
+  attemptsUsed: number;
+  attemptsRemaining: number | null;
+  questionsCount: number;
+  currentAttemptId: string | null;
+  currentAttemptStatus: AttemptStatusCode | null;
+}
+
+export interface StudentAttemptResultDto {
+  attemptId: string;
+  assessmentId: string;
+  assessmentTitle: string;
+  status: AttemptStatusCode;
+  attemptNumber: number;
+  maxAttempts: number | null;
+  score: number | null;
+  maxScore: number | null;
+  scorePercentage: number | null;
+  submittedAt: string | null;
+  gradedAt: string | null;
+  pendingManualGrade: boolean;
+  passed: boolean | null;
+  passingScore: number | null;
 }

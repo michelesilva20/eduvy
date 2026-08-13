@@ -33,6 +33,7 @@ const PERMISSIONS = [
   "assessments.create",
   "assessments.update",
   "assessments.publish",
+  "assessments.attempt",
   "audit.read",
   "entitlements.read",
 ];
@@ -301,8 +302,13 @@ async function main() {
     roleCode: "INSTRUCTOR",
   });
 
-  const learningPermission = await prisma.permission.findUniqueOrThrow({
-    where: { code: "learning_progress.read" },
+  const studentPermissionCodes = [
+    "learning_progress.read",
+    "assessments.attempt",
+  ] as const;
+
+  const studentPermissions = await prisma.permission.findMany({
+    where: { code: { in: [...studentPermissionCodes] } },
   });
 
   const instructorPermissionCodes = [
@@ -318,6 +324,7 @@ async function main() {
     "assessments.create",
     "assessments.update",
     "assessments.publish",
+    "assessments.attempt",
   ] as const;
 
   const instructorPermissions = await prisma.permission.findMany({
@@ -329,20 +336,22 @@ async function main() {
       where: { tenantId_code: { tenantId: tenant.id, code: "STUDENT" } },
     });
     if (studentRole) {
-      await prisma.rolePermission.upsert({
-        where: {
-          tenantRoleId_permissionId: {
-            tenantRoleId: studentRole.id,
-            permissionId: learningPermission.id,
+      for (const permission of studentPermissions) {
+        await prisma.rolePermission.upsert({
+          where: {
+            tenantRoleId_permissionId: {
+              tenantRoleId: studentRole.id,
+              permissionId: permission.id,
+            },
           },
-        },
-        update: {},
-        create: {
-          tenantId: tenant.id,
-          tenantRoleId: studentRole.id,
-          permissionId: learningPermission.id,
-        },
-      });
+          update: {},
+          create: {
+            tenantId: tenant.id,
+            tenantRoleId: studentRole.id,
+            permissionId: permission.id,
+          },
+        });
+      }
     }
 
     const instructorRole = await prisma.tenantRole.findUnique({
