@@ -461,6 +461,9 @@ model Membership {
 
   roleAssignments MembershipRoleAssignment[]
   groupMemberships GroupMembership[]
+  cohortInstructors CohortInstructor[]
+  enrollments     Enrollment[]
+  assessmentAttempts AssessmentAttempt[]
 
   @@unique([tenantId, id])
   @@unique([tenantId, userId])
@@ -665,6 +668,7 @@ model CourseVersion {
   cohorts Cohort[]
 
   @@unique([tenantId, id])
+  @@unique([tenantId, courseId, id])
   @@unique([tenantId, courseId, version])
   @@map("course_versions")
 }
@@ -752,7 +756,7 @@ model Cohort {
 
   tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   course        Course             @relation(fields: [tenantId, courseId], references: [tenantId, id], onDelete: Restrict)
-  courseVersion CourseVersion      @relation(fields: [tenantId, courseVersionId], references: [tenantId, id], onDelete: Restrict)
+  courseVersion CourseVersion      @relation(fields: [tenantId, courseId, courseVersionId], references: [tenantId, courseId, id], onDelete: Restrict)
   enrollments   Enrollment[]
   instructors   CohortInstructor[]
 
@@ -773,7 +777,8 @@ model CohortInstructor {
   assignedAt   DateTime             @default(now()) @map("assigned_at") @db.Timestamptz(6)
   assignedBy   String?              @map("assigned_by") @db.Uuid
 
-  cohort Cohort @relation(fields: [tenantId, cohortId], references: [tenantId, id], onDelete: Restrict)
+  cohort     Cohort     @relation(fields: [tenantId, cohortId], references: [tenantId, id], onDelete: Restrict)
+  membership Membership @relation(fields: [tenantId, membershipId], references: [tenantId, id], onDelete: Restrict)
 
   @@unique([tenantId, id])
   @@unique([tenantId, cohortId, membershipId])
@@ -797,6 +802,7 @@ model Enrollment {
 
   cohort        Cohort           @relation(fields: [tenantId, cohortId], references: [tenantId, id], onDelete: Restrict)
   courseVersion CourseVersion    @relation(fields: [tenantId, courseVersionId], references: [tenantId, id], onDelete: Restrict)
+  membership    Membership       @relation(fields: [tenantId, membershipId], references: [tenantId, id], onDelete: Restrict)
   lessonProgress LessonProgress[]
 
   @@unique([tenantId, id])
@@ -923,6 +929,7 @@ model AssessmentAttempt {
   updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   assessment Assessment     @relation(fields: [tenantId, assessmentId], references: [tenantId, id], onDelete: Restrict)
+  membership Membership     @relation(fields: [tenantId, membershipId], references: [tenantId, id], onDelete: Restrict)
   answers    AttemptAnswer[]
 
   @@unique([tenantId, id])
