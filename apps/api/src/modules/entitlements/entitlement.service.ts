@@ -30,8 +30,22 @@ export class EntitlementService {
     );
 
     if (!entitlement) {
-      const error = new Error("ENTITLEMENT_DENIED");
-      throw error;
+      throw new Error("ENTITLEMENT_DENIED");
+    }
+  }
+
+  async isEnabled(input: {
+    tenantId: string;
+    userId: string;
+    requestId: string;
+    moduleCode: string;
+    capability: string;
+  }): Promise<boolean> {
+    try {
+      await this.assert(input);
+      return true;
+    } catch {
+      return false;
     }
   }
 }

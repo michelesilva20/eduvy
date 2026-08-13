@@ -12,10 +12,23 @@ export class TenancyService {
   ) {}
 
   async listUserTenants(userId: string): Promise<TenantSummaryDto[]> {
-    const memberships = await this.prisma.membership.findMany({
-      where: { userId, status: "ACTIVE" },
-      include: {
-        tenant: {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT set_config('app.user_id', ${userId}, true)`;
+      await tx.$executeRaw`SELECT set_config('app.tenant_id', '', true)`;
+
+      const memberships = await tx.membership.findMany({
+        where: { userId, status: "ACTIVE" },
+        select: { id: true, tenantId: true, joinedAt: true },
+        orderBy: { joinedAt: "asc" },
+      });
+
+      const results: TenantSummaryDto[] = [];
+
+      for (const membership of memberships) {
+        await tx.$executeRaw`SELECT set_config('app.tenant_id', ${membership.tenantId}, true)`;
+
+        const tenant = await tx.tenant.findUnique({
+          where: { id: membership.tenantId },
           include: {
             subscriptions: {
               where: { status: { in: ["TRIAL", "ACTIVE"] } },
@@ -28,28 +41,29 @@ export class TenancyService {
               },
             },
           },
-        },
-        roleAssignments: {
+        });
+
+        if (!tenant) continue;
+
+        const roleAssignment = await tx.membershipRoleAssignment.findFirst({
+          where: { membershipId: membership.id },
           include: { tenantRole: true },
           orderBy: { createdAt: "asc" },
-          take: 1,
-        },
-      },
-      orderBy: { joinedAt: "asc" },
-    });
+        });
 
-    return memberships.map((membership: (typeof memberships)[number]) => {
-      const subscription = membership.tenant.subscriptions[0];
-      const role = membership.roleAssignments[0]?.tenantRole;
+        const subscription = tenant.subscriptions[0];
 
-      return {
-        id: membership.tenant.id,
-        name: membership.tenant.name,
-        slug: membership.tenant.slug,
-        planName: subscription?.planVersion.plan.name ?? null,
-        roleName: role?.name ?? null,
-        membershipId: membership.id,
-      };
+        results.push({
+          id: tenant.id,
+          name: tenant.name,
+          slug: tenant.slug,
+          planName: subscription?.planVersion.plan.name ?? null,
+          roleName: roleAssignment?.tenantRole.name ?? null,
+          membershipId: membership.id,
+        });
+      }
+
+      return results;
     });
   }
 
@@ -82,6 +96,9 @@ export class TenancyService {
         },
       });
 
+      await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenant.id}, true)`;
+      await tx.$executeRaw`SELECT set_config('app.user_id', ${input.ownerUserId}, true)`;
+
       const membership = await tx.membership.create({
         data: {
           tenantId: tenant.id,
@@ -99,6 +116,18 @@ export class TenancyService {
           isSystem: true,
         },
       });
+
+      const permissions = await tx.permission.findMany();
+      if (permissions.length > 0) {
+        await tx.rolePermission.createMany({
+          data: permissions.map((permission) => ({
+            tenantId: tenant.id,
+            tenantRoleId: ownerRole.id,
+            permissionId: permission.id,
+          })),
+          skipDuplicates: true,
+        });
+      }
 
       await tx.membershipRoleAssignment.create({
         data: {
